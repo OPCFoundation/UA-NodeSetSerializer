@@ -1,32 +1,18 @@
 # UANodeSetSerializer
 
-> **This is PROTOTYPE code for a draft encoding. It is not a published OPC Foundation
-> specification, and the JSON schema WILL change before release.** Do not treat the format
-> emitted here as stable, and do not build a production interchange on it.
+`Opc.Ua.NodeSetSerializer` is a .NET class library that reads and writes OPC UA NodeSets in XML and JSON. It is the shared
+serialization component. It provides everything the OPC UA NodeSet Editor needs to load, edit and emit NodeSets lives here.
 
-`Opc.Ua.JsonNodeSet` is a .NET class library that reads and writes OPC UA NodeSets in XML and
-JSON, including the normative property ordering the JSON encoding requires. It is the shared
-serialization component: everything the OPC UA NodeSet Editor needs to load, edit and emit
-NodeSets lives here.
-
-## Scope
-
-| In | Out |
-|----|-----|
-| XML NodeSet read/write (`UANodeSet.xsd`) | Line-delimited JSON (JSONL) |
-| JSON NodeSet read/write | RDF / JSON-LD export |
-| Normative property ordering and order validation | Compressed `.uanodeset` archives |
-| Address space model, variant conversion, SPDX headers | The `Opc.Ua.NodeSetTool` command-line tool |
-
-The formats in the right-hand column are prototypes of draft encodings and live in the internal
-[UA-NodeSetTool](https://github.com/OPCF-Members/UA-NodeSetTool) repository, which consumes this
-library and extends `NodeSetSerializer` to add them.
+> The JSON serialization in this library is not a published OPC Foundation serialization format.
+> It was developed to meet the requirements for the OPC UA NodeSetEditor and is only meant for use in that context.
+> **Do not treat the JSON format emitted here as stable.**
+> The OPC Foundation will publish an official JSON NodeSet serialization and this library will be updated to match.
 
 ## Documents
 
 * [`canonical-nodeid-encoding.md`](canonical-nodeid-encoding.md) — how NodeIds are encoded in the JSON form.
 * [`uri-percent-encoding.md`](uri-percent-encoding.md) — percent-encoding rules for URIs appearing in NodeIds.
-* [`Opc.Ua.JsonNodeSet/json-nodeset-schema.json`](Opc.Ua.JsonNodeSet/json-nodeset-schema.json) — the JSON Schema for the encoding.
+* [`Opc.Ua.NodeSetSerializer/json-nodeset-schema.json`](Opc.Ua.JsonNodeSet/json-nodeset-schema.json) — the JSON Schema for the encoding.
 
 ## Licence
 

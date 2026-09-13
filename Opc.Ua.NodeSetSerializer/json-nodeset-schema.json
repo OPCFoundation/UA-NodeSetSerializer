@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://opcfoundation.org/schemas/json-nodeset/1.0.0/json-nodeset-schema.json",
-  "title": "OPC UA NodeSet (DRAFT - not a released specification)",
-  "$comment": "DRAFT. This schema is prototype work, not a released OPC Foundation specification, and it WILL change before release. Do not build a production interchange on it.",
-  "description": "DRAFT - NOT A RELEASED SPECIFICATION. This schema is prototype work and will change. Schema for OPC UA NodeSet in JSON format. Supports lossless conversion between JSON and XML UANodeSet formats. Property order within every object is normative: see Annex I.2 of OPC 10000-6. The Manifest definition describes the manifest.json entry of a multi-file archive and is not reachable from the document root.",
+  "title": "OPC UA NodeSet (for use with the OPC UA NodeSetEditor)",
+  "$comment": "Do not treat this JSON schema as stable or suitable for use outside the OPC UA NodeSet Editor.",
+  "description": "Schema for OPC UA NodeSet in JSON format. Supports lossless conversion between JSON and XML UANodeSet formats.",
   "contact": {
     "email": "office@opcfoundation.org"
   },
@@ -21,11 +21,11 @@
         },
         "Ordered": {
           "description": "If TRUE the order of Nodes is guaranteed to follow the requirements in Annex I.2. An absent field is equivalent to FALSE and asserts nothing.",
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "HasManifest": {
           "description": "If TRUE a manifest file exists and this UANodeSet is part of a multi-file archive. The Models and Declarations fields are specified in the manifest and are not present here.",
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "Models": {
           "type": "array",
@@ -35,7 +35,7 @@
         },
         "ChangeSet": {
           "description": "If TRUE the Nodes are treated as changes to be applied to an existing model.",
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "Operation": {
           "description": "The type of operation to apply when the file is processed. Only specified if ChangeSet is TRUE.",
@@ -62,7 +62,7 @@
       "properties": {
         "Ordered": {
           "description": "If TRUE, the set of files follows the ordering rules defined in Annex I.2.",
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "Models": {
           "type": "array",
@@ -169,12 +169,12 @@
           "type": "string"
         },
         "PublicationDate": {
-          "type": ["string", "null"],
+          "type": [ "string", "null" ],
           "format": "date"
         },
         "IsPartial": {
           "description": "If TRUE the UANodeSet only contains some of the Nodes in the Model.",
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "Version": {
           "description": "A human-readable version string for the model.",
@@ -185,7 +185,7 @@
           "type": "string"
         },
         "DefaultAccessRestrictions": {
-          "type": ["integer", "null"],
+          "type": [ "integer", "null" ],
           "format": "int64",
           "minimum": 0,
           "maximum": 4294967296
@@ -216,7 +216,7 @@
           "type": "string"
         },
         "PublicationDate": {
-          "type": ["string", "null"],
+          "type": [ "string", "null" ],
           "format": "date"
         },
         "Version": {
@@ -230,7 +230,7 @@
     },
     "OperationType": {
       "description": "The type of change applied when the Nodes are processed. Insert requires the Node not to exist, Update requires it to exist, Delete removes it together with every Node whose ParentId names it.",
-      "enum": [0, 1, 2],
+      "enum": [ 0, 1, 2 ],
       "x-enum-varnames": [
         "Insert",
         "Update",
@@ -282,10 +282,10 @@
           "$ref": "#/$defs/LocalizedText"
         },
         "IsAbstract": {
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "WriteMask": {
-          "type": ["integer", "null"],
+          "type": [ "integer", "null" ],
           "format": "int64",
           "minimum": 0,
           "maximum": 4294967296
@@ -297,16 +297,16 @@
           }
         },
         "AccessRestrictions": {
-          "type": ["integer", "null"],
+          "type": [ "integer", "null" ],
           "format": "int64",
           "minimum": 0,
           "maximum": 4294967296
         },
         "HasNoPermissions": {
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "DesignToolOnly": {
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "Children": {
           "$ref": "#/$defs/ChildList"
@@ -335,7 +335,7 @@
           "type": "object",
           "properties": {
             "EventNotifier": {
-              "type": ["integer", "null"],
+              "type": [ "integer", "null" ],
               "minimum": 0,
               "maximum": 255
             }
@@ -355,7 +355,7 @@
               "type": "string"
             },
             "ValueRank": {
-              "type": ["integer", "null"],
+              "type": [ "integer", "null" ],
               "format": "int32",
               "default": -1
             },
@@ -366,16 +366,16 @@
               "$ref": "#/$defs/Variant"
             },
             "AccessLevel": {
-              "type": ["integer", "null"],
+              "type": [ "integer", "null" ],
               "format": "int64",
               "minimum": 0,
               "maximum": 4294967296
             },
             "MinimumSamplingInterval": {
-              "type": ["number", "null"]
+              "type": [ "number", "null" ]
             },
             "Historizing": {
-              "type": ["boolean", "null"]
+              "type": [ "boolean", "null" ]
             }
           }
         }
@@ -394,7 +394,7 @@
               "type": "string"
             },
             "Executable": {
-              "type": ["boolean", "null"]
+              "type": [ "boolean", "null" ]
             }
           }
         }
@@ -409,12 +409,12 @@
           "type": "object",
           "properties": {
             "EventNotifier": {
-              "type": ["integer", "null"],
+              "type": [ "integer", "null" ],
               "minimum": 0,
               "maximum": 255
             },
             "ContainsNoLoops": {
-              "type": ["boolean", "null"]
+              "type": [ "boolean", "null" ]
             }
           }
         }
@@ -442,7 +442,7 @@
               "type": "string"
             },
             "ValueRank": {
-              "type": ["integer", "null"],
+              "type": [ "integer", "null" ],
               "format": "int32",
               "default": -1
             },
@@ -483,7 +483,7 @@
           "type": "object",
           "properties": {
             "Symmetric": {
-              "type": ["boolean", "null"]
+              "type": [ "boolean", "null" ]
             },
             "InverseName": {
               "$ref": "#/$defs/LocalizedText"
@@ -523,7 +523,7 @@
           "type": "string"
         },
         "IsForward": {
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "TargetId": {
           "type": "string"
@@ -552,10 +552,10 @@
           "type": "string"
         },
         "IsUnion": {
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "IsOptionSet": {
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "Fields": {
           "type": "array",
@@ -581,26 +581,26 @@
           "$ref": "#/$defs/LocalizedText"
         },
         "Value": {
-          "type": ["integer", "null"]
+          "type": [ "integer", "null" ]
         },
         "DataType": {
           "type": "string"
         },
         "ValueRank": {
-          "type": ["integer", "null"],
+          "type": [ "integer", "null" ],
           "format": "int32"
         },
         "ArrayDimensions": {
           "type": "string"
         },
         "MaxStringLength": {
-          "type": ["integer", "null"]
+          "type": [ "integer", "null" ]
         },
         "IsOptional": {
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         },
         "AllowSubTypes": {
-          "type": ["boolean", "null"]
+          "type": [ "boolean", "null" ]
         }
       }
     },
@@ -613,7 +613,7 @@
       "type": "string"
     },
     "NodeClass": {
-      "enum": [0, 1, 2, 4, 8, 16, 32, 64, 128],
+      "enum": [ 0, 1, 2, 4, 8, 16, 32, 64, 128 ],
       "x-enum-varnames": [
         "Unspecified",
         "UAObject",
