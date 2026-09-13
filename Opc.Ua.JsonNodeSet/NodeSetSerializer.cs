@@ -2268,7 +2268,7 @@ namespace NodeSetTool
 
                     case nameof(BuiltInType.SByte):
                         {
-                            if (!SByte.TryParse(input.InnerText, out var value))
+                            if (!SByte.TryParse(input.InnerText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value))
                             {
                                 throw new InvalidDataException($"{input.InnerText} is a SByte.");
                             }
@@ -2278,7 +2278,7 @@ namespace NodeSetTool
 
                     case nameof(BuiltInType.Byte):
                         {
-                            if (!Byte.TryParse(input.InnerText, out var value))
+                            if (!Byte.TryParse(input.InnerText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value))
                             {
                                 throw new InvalidDataException($"{input.InnerText} is a Byte.");
                             }
@@ -2288,7 +2288,7 @@ namespace NodeSetTool
 
                     case nameof(BuiltInType.Int16):
                         {
-                            if (!Int16.TryParse(input.InnerText, out var value))
+                            if (!Int16.TryParse(input.InnerText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value))
                             {
                                 throw new InvalidDataException($"{input.InnerText} is a Int16.");
                             }
@@ -2298,7 +2298,7 @@ namespace NodeSetTool
 
                     case nameof(BuiltInType.UInt16):
                         {
-                            if (!Int16.TryParse(input.InnerText, out var value))
+                            if (!Int16.TryParse(input.InnerText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value))
                             {
                                 throw new InvalidDataException($"{input.InnerText} is a UInt16.");
                             }
@@ -2308,7 +2308,7 @@ namespace NodeSetTool
 
                     case nameof(BuiltInType.Int32):
                         {
-                            if (!Int32.TryParse(input.InnerText, out var value))
+                            if (!Int32.TryParse(input.InnerText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value))
                             {
                                 throw new InvalidDataException($"{input.InnerText} is a Int32.");
                             }
@@ -2318,7 +2318,7 @@ namespace NodeSetTool
 
                     case nameof(BuiltInType.UInt32):
                         {
-                            if (!UInt32.TryParse(input.InnerText, out var value))
+                            if (!UInt32.TryParse(input.InnerText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value))
                             {
                                 throw new InvalidDataException($"{input.InnerText} is a UInt32.");
                             }
@@ -2328,7 +2328,7 @@ namespace NodeSetTool
 
                     case nameof(BuiltInType.Int64):
                         {
-                            if (!Int64.TryParse(input.InnerText, out var value))
+                            if (!Int64.TryParse(input.InnerText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value))
                             {
                                 throw new InvalidDataException($"{input.InnerText} is a Int64.");
                             }
@@ -2338,7 +2338,7 @@ namespace NodeSetTool
 
                     case nameof(BuiltInType.UInt64):
                         {
-                            if (!UInt64.TryParse(input.InnerText, out var value))
+                            if (!UInt64.TryParse(input.InnerText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value))
                             {
                                 throw new InvalidDataException($"{input.InnerText} is a UInt64.");
                             }
@@ -2348,7 +2348,7 @@ namespace NodeSetTool
 
                     case nameof(BuiltInType.Float):
                         {
-                            if (!Single.TryParse(input.InnerText, out var value))
+                            if (!Single.TryParse(input.InnerText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
                             {
                                 throw new InvalidDataException($"{input.InnerText} is a                     case nameof(BuiltInType.Float):\r\n.");
                             }
@@ -2358,9 +2358,9 @@ namespace NodeSetTool
 
                     case nameof(BuiltInType.Double):
                         {
-                            if (!Double.TryParse(input.InnerText, out var value))
+                            if (!Double.TryParse(input.InnerText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
                             {
-                                throw new InvalidDataException($"{input.InnerText} is a Double.");
+                                throw new InvalidDataException($"{input.InnerText} is not a valid Double.");
                             }
 
                             return value;
@@ -2434,7 +2434,7 @@ namespace NodeSetTool
                                 return 0U;
                             }
 
-                            if (!UInt32.TryParse(input.InnerText, out var value))
+                            if (!UInt32.TryParse(input.InnerText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value))
                             {
                                 throw new InvalidDataException($"{input.InnerText} is a StatusCode.");
                             }
