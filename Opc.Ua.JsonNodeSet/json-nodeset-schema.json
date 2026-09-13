@@ -1,0 +1,682 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opcfoundation.org/schemas/json-nodeset/1.0.0/json-nodeset-schema.json",
+  "title": "OPC UA NodeSet (DRAFT - not a released specification)",
+  "$comment": "DRAFT. This schema is prototype work, not a released OPC Foundation specification, and it WILL change before release. Do not build a production interchange on it.",
+  "description": "DRAFT - NOT A RELEASED SPECIFICATION. This schema is prototype work and will change. Schema for OPC UA NodeSet in JSON format. Supports lossless conversion between JSON and XML UANodeSet formats. Property order within every object is normative: see Annex I.2 of OPC 10000-6. The Manifest definition describes the manifest.json entry of a multi-file archive and is not reachable from the document root.",
+  "contact": {
+    "email": "office@opcfoundation.org"
+  },
+  "license": {
+    "name": "MIT",
+    "url": "https://opcfoundation.org/license/mit.html"
+  },
+  "$ref": "#/$defs/UANodeSet",
+  "$defs": {
+    "UANodeSet": {
+      "type": "object",
+      "properties": {
+        "SPDX": {
+          "$ref": "#/$defs/SPDXDeclaration"
+        },
+        "Ordered": {
+          "description": "If TRUE the order of Nodes is guaranteed to follow the requirements in Annex I.2. An absent field is equivalent to FALSE and asserts nothing.",
+          "type": ["boolean", "null"]
+        },
+        "HasManifest": {
+          "description": "If TRUE a manifest file exists and this UANodeSet is part of a multi-file archive. The Models and Declarations fields are specified in the manifest and are not present here.",
+          "type": ["boolean", "null"]
+        },
+        "Models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelDefinition"
+          }
+        },
+        "ChangeSet": {
+          "description": "If TRUE the Nodes are treated as changes to be applied to an existing model.",
+          "type": ["boolean", "null"]
+        },
+        "Operation": {
+          "description": "The type of operation to apply when the file is processed. Only specified if ChangeSet is TRUE.",
+          "oneOf": [
+            { "$ref": "#/$defs/OperationType" },
+            { "type": "null" }
+          ]
+        },
+        "Declarations": {
+          "description": "Nodes needed to resolve recursive relationships. Only the mandatory fields of UANode are specified. Only present if Ordered is TRUE and recursive relationships exist.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UANode"
+          }
+        },
+        "Nodes": {
+          "$ref": "#/$defs/NodeContainer"
+        }
+      }
+    },
+    "Manifest": {
+      "description": "The manifest.json entry of a multi-file archive. It specifies the order in which the archive's files are processed. Any file in the archive that is not referenced by the manifest is an error.",
+      "type": "object",
+      "properties": {
+        "Ordered": {
+          "description": "If TRUE, the set of files follows the ordering rules defined in Annex I.2.",
+          "type": ["boolean", "null"]
+        },
+        "Models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelDefinition"
+          }
+        },
+        "Declarations": {
+          "description": "Nodes needed to resolve recursive relationships. Only the mandatory fields of UANode are specified. Only present if Ordered is TRUE and recursive relationships exist.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UANode"
+          }
+        },
+        "Files": {
+          "description": "The archive file names. The order of the list specifies the order in which the files are processed.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "SPDXDeclaration": {
+      "description": "The licence and copyright information for the UANodeSet. It is needed because JSON does not have a syntax for comments.",
+      "type": "object",
+      "properties": {
+        "CopyrightText": {
+          "type": "string"
+        },
+        "LicenceId": {
+          "description": "The SPDX identifier for the licence.",
+          "type": "string"
+        },
+        "LicenceRef": {
+          "description": "A URL for the licence. Optional if a standard SPDX identifier is specified. Required if the LicenceId is a LicenseRef- identifier.",
+          "type": "string"
+        }
+      }
+    },
+    "NodeContainer": {
+      "description": "Nodes organized into eight properties, one per NodeClass. Absent properties indicate that no Nodes of that class are present. Type Nodes precede instance Nodes.",
+      "type": "object",
+      "properties": {
+        "ReferenceTypes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UAReferenceType"
+          }
+        },
+        "DataTypes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UADataType"
+          }
+        },
+        "VariableTypes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UAVariableType"
+          }
+        },
+        "ObjectTypes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UAObjectType"
+          }
+        },
+        "Variables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UAVariable"
+          }
+        },
+        "Methods": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UAMethod"
+          }
+        },
+        "Objects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UAObject"
+          }
+        },
+        "Views": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UAView"
+          }
+        }
+      }
+    },
+    "ModelDefinition": {
+      "description": "A model defined in the UANodeSet, including its version and dependencies. The fields are declared inline rather than composed from ModelReference because IsPartial is interleaved with the inherited fields in the normative order.",
+      "type": "object",
+      "properties": {
+        "ModelUri": {
+          "type": "string"
+        },
+        "ModelVersion": {
+          "description": "The model version as a SemVer string. Comparison rules follow the SemVer specification.",
+          "type": "string"
+        },
+        "PublicationDate": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "IsPartial": {
+          "description": "If TRUE the UANodeSet only contains some of the Nodes in the Model.",
+          "type": ["boolean", "null"]
+        },
+        "Version": {
+          "description": "A human-readable version string for the model.",
+          "type": "string"
+        },
+        "XmlSchemaUri": {
+          "description": "The URI for the XML schema namespace used to serialize values of the DataTypes defined by the model. Required if DataTypes are defined in the UANodeSet.",
+          "type": "string"
+        },
+        "DefaultAccessRestrictions": {
+          "type": ["integer", "null"],
+          "format": "int64",
+          "minimum": 0,
+          "maximum": 4294967296
+        },
+        "DefaultRolePermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RolePermission"
+          }
+        },
+        "RequiredModels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelReference"
+          }
+        }
+      }
+    },
+    "ModelReference": {
+      "description": "A dependency of the Model defined in the UANodeSet.",
+      "type": "object",
+      "properties": {
+        "ModelUri": {
+          "type": "string"
+        },
+        "ModelVersion": {
+          "description": "The version of the required model using SemVer notation.",
+          "type": "string"
+        },
+        "PublicationDate": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "Version": {
+          "description": "A human-readable version string.",
+          "type": "string"
+        },
+        "XmlSchemaUri": {
+          "type": "string"
+        }
+      }
+    },
+    "OperationType": {
+      "description": "The type of change applied when the Nodes are processed. Insert requires the Node not to exist, Update requires it to exist, Delete removes it together with every Node whose ParentId names it.",
+      "enum": [0, 1, 2],
+      "x-enum-varnames": [
+        "Insert",
+        "Update",
+        "Delete"
+      ],
+      "type": "integer"
+    },
+    "UANode": {
+      "description": "Base type for all OPC UA nodes. Concrete node types are distinguished by the NodeClass property: 1=UAObject, 2=UAVariable, 4=UAMethod, 8=UAObjectType, 16=UAVariableType, 32=UAReferenceType, 64=UADataType, 128=UAView. NodeId, NodeClass and BrowseName are mandatory and are emitted first, so a decoder can register a Node before reading the fields that may refer back to it.",
+      "type": "object",
+      "properties": {
+        "NodeId": {
+          "type": "string"
+        },
+        "NodeClass": {
+          "$ref": "#/$defs/NodeClass"
+        },
+        "BrowseName": {
+          "type": "string"
+        },
+        "SymbolicName": {
+          "type": "string"
+        },
+        "ParentId": {
+          "description": "The owner of the Node. Ownership is separate from any References between a parent and child: it indicates that a Node is deleted when its parent is deleted. Ignored when the Node is in a ChildList, where the owner is always the containing Node. The parent to child direction of the reference is implied by this field and is not repeated in the parent's References list; only the child's inverse reference to the parent is stored.",
+          "type": "string"
+        },
+        "TypeId": {
+          "description": "The TypeDefinition for the Node. Only set for Objects and Variables. HasTypeDefinition References are not emitted for Objects and Variables.",
+          "type": "string"
+        },
+        "ModellingRuleId": {
+          "description": "The ModellingRule for the Node. Only set for Objects, Variables and Methods. HasModellingRule References are not emitted.",
+          "type": "string"
+        },
+        "DisplayName": {
+          "$ref": "#/$defs/LocalizedText"
+        },
+        "ReleaseStatus": {
+          "oneOf": [
+            { "$ref": "#/$defs/ReleaseStatus" },
+            { "type": "null" }
+          ]
+        },
+        "Documentation": {
+          "type": "string"
+        },
+        "Description": {
+          "$ref": "#/$defs/LocalizedText"
+        },
+        "IsAbstract": {
+          "type": ["boolean", "null"]
+        },
+        "WriteMask": {
+          "type": ["integer", "null"],
+          "format": "int64",
+          "minimum": 0,
+          "maximum": 4294967296
+        },
+        "RolePermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RolePermission"
+          }
+        },
+        "AccessRestrictions": {
+          "type": ["integer", "null"],
+          "format": "int64",
+          "minimum": 0,
+          "maximum": 4294967296
+        },
+        "HasNoPermissions": {
+          "type": ["boolean", "null"]
+        },
+        "DesignToolOnly": {
+          "type": ["boolean", "null"]
+        },
+        "Children": {
+          "$ref": "#/$defs/ChildList"
+        },
+        "References": {
+          "description": "References to other nodes, excluding those expressed by the TypeId, ModellingRuleId and ParentId fields. A forward reference from a node to one of its own children is omitted because ParentId implies it; the child states the reference as an inverse reference to the parent instead.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Reference"
+          }
+        },
+        "ConformanceUnits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "UAObject": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/UANode"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "EventNotifier": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        }
+      ]
+    },
+    "UAVariable": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/UANode"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "DataType": {
+              "type": "string"
+            },
+            "ValueRank": {
+              "type": ["integer", "null"],
+              "format": "int32",
+              "default": -1
+            },
+            "ArrayDimensions": {
+              "type": "string"
+            },
+            "Value": {
+              "$ref": "#/$defs/Variant"
+            },
+            "AccessLevel": {
+              "type": ["integer", "null"],
+              "format": "int64",
+              "minimum": 0,
+              "maximum": 4294967296
+            },
+            "MinimumSamplingInterval": {
+              "type": ["number", "null"]
+            },
+            "Historizing": {
+              "type": ["boolean", "null"]
+            }
+          }
+        }
+      ]
+    },
+    "UAMethod": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/UANode"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "MethodDeclarationId": {
+              "description": "The NodeId of the Method with the same BrowseName declared by the TypeDefinition of the Object that contains this Method. Set only on Methods that have a ParentId naming an Object whose TypeId is an ObjectType, and where that ObjectType or one of its supertypes declares a Method of that BrowseName. When a subtype overrides a Method it inherits, this references the Method Node in the subtype.",
+              "type": "string"
+            },
+            "Executable": {
+              "type": ["boolean", "null"]
+            }
+          }
+        }
+      ]
+    },
+    "UAView": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/UANode"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "EventNotifier": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "maximum": 255
+            },
+            "ContainsNoLoops": {
+              "type": ["boolean", "null"]
+            }
+          }
+        }
+      ]
+    },
+    "UAObjectType": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/UANode"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "UAVariableType": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/UANode"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "DataType": {
+              "type": "string"
+            },
+            "ValueRank": {
+              "type": ["integer", "null"],
+              "format": "int32",
+              "default": -1
+            },
+            "ArrayDimensions": {
+              "type": "string"
+            },
+            "Value": {
+              "$ref": "#/$defs/Variant"
+            }
+          }
+        }
+      ]
+    },
+    "UADataType": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/UANode"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Purpose": {
+              "$ref": "#/$defs/DataTypePurpose"
+            },
+            "Definition": {
+              "$ref": "#/$defs/DataTypeDefinition"
+            }
+          }
+        }
+      ]
+    },
+    "UAReferenceType": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/UANode"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Symmetric": {
+              "type": ["boolean", "null"]
+            },
+            "InverseName": {
+              "$ref": "#/$defs/LocalizedText"
+            }
+          }
+        }
+      ]
+    },
+    "ChildList": {
+      "description": "An inline representation of child Nodes that are hierarchically related to their parent. Setting ParentId on a Node is equivalent to adding it to a ChildList. The actual Reference between parent and child is specified in the References of the child. Nesting is permitted.",
+      "type": "object",
+      "properties": {
+        "Objects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UAObject"
+          }
+        },
+        "Variables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UAVariable"
+          }
+        },
+        "Methods": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UAMethod"
+          }
+        }
+      }
+    },
+    "Reference": {
+      "type": "object",
+      "properties": {
+        "ReferenceTypeId": {
+          "type": "string"
+        },
+        "IsForward": {
+          "type": ["boolean", "null"]
+        },
+        "TargetId": {
+          "type": "string"
+        }
+      }
+    },
+    "RolePermission": {
+      "type": "object",
+      "properties": {
+        "RoleId": {
+          "type": "string"
+        },
+        "Permissions": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0,
+          "maximum": 4294967296
+        }
+      }
+    },
+    "DataTypeDefinition": {
+      "description": "The structure or enumeration definition of a DataType. It has no Name of its own: the BrowseName of the containing DataType is the normative source, and the XML Definition Name attribute is restored from it.",
+      "type": "object",
+      "properties": {
+        "SymbolicName": {
+          "type": "string"
+        },
+        "IsUnion": {
+          "type": ["boolean", "null"]
+        },
+        "IsOptionSet": {
+          "type": ["boolean", "null"]
+        },
+        "Fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DataTypeField"
+          }
+        }
+      }
+    },
+    "DataTypeField": {
+      "type": "object",
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "SymbolicName": {
+          "type": "string"
+        },
+        "DisplayName": {
+          "$ref": "#/$defs/LocalizedText"
+        },
+        "Description": {
+          "$ref": "#/$defs/LocalizedText"
+        },
+        "Value": {
+          "type": ["integer", "null"]
+        },
+        "DataType": {
+          "type": "string"
+        },
+        "ValueRank": {
+          "type": ["integer", "null"],
+          "format": "int32"
+        },
+        "ArrayDimensions": {
+          "type": "string"
+        },
+        "MaxStringLength": {
+          "type": ["integer", "null"]
+        },
+        "IsOptional": {
+          "type": ["boolean", "null"]
+        },
+        "AllowSubTypes": {
+          "type": ["boolean", "null"]
+        }
+      }
+    },
+    "ReleaseStatus": {
+      "enum": [
+        "Released",
+        "Draft",
+        "Deprecated"
+      ],
+      "type": "string"
+    },
+    "NodeClass": {
+      "enum": [0, 1, 2, 4, 8, 16, 32, 64, 128],
+      "x-enum-varnames": [
+        "Unspecified",
+        "UAObject",
+        "UAVariable",
+        "UAMethod",
+        "UAObjectType",
+        "UAVariableType",
+        "UAReferenceType",
+        "UADataType",
+        "UAView"
+      ],
+      "type": "integer"
+    },
+    "DataTypePurpose": {
+      "enum": [
+        "Normal",
+        "ServicesOnly",
+        "CodeGenerator"
+      ],
+      "type": "string"
+    },
+    "LocalizedText": {
+      "type": "object",
+      "properties": {
+        "t": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "r": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "Variant": {
+      "type": "object",
+      "properties": {
+        "UaType": {
+          "type": "integer",
+          "format": "int32",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "Value": {},
+        "Dimensions": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Opc.Ua.JsonNodeSet</RootNamespace>
+    <AssemblyName>Opc.Ua.JsonNodeSet</AssemblyName>
+    <Product>OPC UA JSON NodeSet Library</Product>
+    <Configurations>Debug;Release;Staging</Configurations>
+  </PropertyGroup>
+
+  <!-- NuGet package metadata -->
+  <PropertyGroup>
+    <PackageId>Opc.Ua.JsonNodeSet</PackageId>
+    <Description>Library for reading, writing, and converting OPC UA NodeSets between XML, JSON, and compressed archive formats.</Description>
+    <PackageTags>OPC-UA;NodeSet;JSON;XML</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" Condition="Exists('..\README.md')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- OPC UA Core (Services) NodeSet baked in as a fallback so single-file converts
+         can resolve standard DataTypes (Argument, EUInformation, etc.) without the
+         caller having to load Core explicitly. -->
+    <EmbeddedResource Include="Resources\Opc.Ua.NodeSet2.Services.xml">
+      <LogicalName>Opc.Ua.JsonNodeSet.Resources.Opc.Ua.NodeSet2.Services.xml</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!--
+    Friend assemblies. The prototype encodings of draft specifications (JSONL, RDF/JSON-LD) ship
+    as their own assemblies and attach through NodeSetSerializer.AddFormat. Writing a NodeSet
+    needs the loaded document and the shared helpers that build it, which are internal here
+    rather than public: keeping them off the package API leaves them free to change, as long as
+    the friends change with them. The named assemblies are not part of this repository.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Opc.Ua.JsonNodeSet.Jsonl" />
+    <InternalsVisibleTo Include="Opc.Ua.JsonNodeSet.Rdf" />
+    <InternalsVisibleTo Include="Opc.Ua.NodeSetTool.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="SharpCompress" Version="0.50.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="Nerdbank.GitVersioning" Version="3.10.91" />
+  </ItemGroup>
+
+</Project>

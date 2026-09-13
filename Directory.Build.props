@@ -1,0 +1,33 @@
+﻿<Project>
+
+  <!--
+    Self-contained on purpose. MSBuild stops at the FIRST Directory.Build.props it finds
+    walking up from a project, so this file - not the one in the UA-NodeSetTool repo root -
+    governs everything under UANodeSetSerializer. It must therefore carry the package metadata
+    outright rather than inheriting it: once this directory is replaced by a submodule
+    pointing at the public UANodeSetSerializer repository, there is no parent to inherit from.
+  -->
+
+  <PropertyGroup>
+    <Authors>OPC Foundation</Authors>
+    <Company>OPC Foundation</Company>
+    <Copyright>Copyright © OPC Foundation</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/OPCFoundation/UANodeSetSerializer</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/OPCFoundation/UANodeSetSerializer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <!-- Nerdbank.GitVersioning: derives version from version.json + git height. Reads the
+       version.json next to this file, so the public library versions independently of
+       the tool repository that hosts it. -->
+  <ItemGroup>
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.7.115" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Assembly signing via environment variable set by the hosting repo's signing-key.ps1 -->
+  <PropertyGroup Condition="'$(SignAssembly)' == 'true' And '$(AssemblyOriginatorKeyFile)' != ''">
+    <SignAssembly>true</SignAssembly>
+  </PropertyGroup>
+
+</Project>

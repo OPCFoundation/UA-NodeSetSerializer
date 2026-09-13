@@ -1,0 +1,16 @@
+using System.Runtime.Serialization;
+using Newtonsoft.Json;
+
+namespace Opc.Ua.JsonNodeSet.Model;
+
+[DataContract]
+public class UAView : UANode
+{
+    [DataMember]
+    [JsonProperty(Order = 21)]
+    public int? EventNotifier { get; set; }
+
+    [DataMember]
+    [JsonProperty(Order = 22)]
+    public bool? ContainsNoLoops { get; set; }
+}
