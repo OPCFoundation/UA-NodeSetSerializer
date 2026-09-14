@@ -1,7 +1,7 @@
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
 
-namespace Opc.Ua.JsonNodeSet.Model;
+namespace Opc.Ua.NodeSetSerializer.Model;
 
 /// <summary>
 /// Base type for all OPC UA Nodes. NodeId, NodeClass and BrowseName are mandatory and are emitted

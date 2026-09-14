@@ -2,9 +2,9 @@ using System.IO.Compression;
 using System.Formats.Tar;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
-using Opc.Ua.JsonNodeSet.Model;
+using Opc.Ua.NodeSetSerializer.Model;
 
-namespace Opc.Ua.JsonNodeSet;
+namespace Opc.Ua.NodeSetSerializer;
 
 /// <summary>Something about the file that breaks an Annex I.2 ordering rule.</summary>
 public sealed class OrderViolation

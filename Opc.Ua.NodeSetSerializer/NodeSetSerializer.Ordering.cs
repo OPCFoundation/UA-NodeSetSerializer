@@ -1,4 +1,4 @@
-﻿using Json = Opc.Ua.JsonNodeSet.Model;
+﻿using Json = Opc.Ua.NodeSetSerializer.Model;
 
 namespace NodeSetTool
 {

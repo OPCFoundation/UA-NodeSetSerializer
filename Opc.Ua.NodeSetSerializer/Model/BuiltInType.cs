@@ -1,4 +1,4 @@
-namespace Opc.Ua.JsonNodeSet.Model;
+namespace Opc.Ua.NodeSetSerializer.Model;
 
 /// <summary>
 /// OPC UA built-in type identifiers (Part 6, Table A.1).

@@ -1,6 +1,6 @@
 using NodeSetTool;
 
-namespace Opc.Ua.JsonNodeSet;
+namespace Opc.Ua.NodeSetSerializer;
 
 /// <summary>
 /// Loads the OPC UA Core (Services) NodeSet bundled with this assembly as an embedded
@@ -15,7 +15,7 @@ namespace Opc.Ua.JsonNodeSet;
 /// </summary>
 public static class CoreNodeSetLoader
 {
-    private const string EmbeddedResourceName = "Opc.Ua.JsonNodeSet.Resources.Opc.Ua.NodeSet2.Services.xml";
+    private const string EmbeddedResourceName = "Opc.Ua.NodeSetSerializer.Resources.Opc.Ua.NodeSet2.Services.xml";
 
     /// <summary>
     /// True when the AddressSpace already has the OPC UA Core namespace loaded.
@@ -41,7 +41,7 @@ public static class CoreNodeSetLoader
             ?? throw new InvalidOperationException(
                 $"Embedded Core NodeSet resource '{EmbeddedResourceName}' not found in {asm.FullName}.");
 
-        var serializer = new NodeSetSerializer();
+        var serializer = new NodeSetTool.NodeSetSerializer();
         serializer.LoadXml(stream);
         serializer.LoadInto(space);
         return true;

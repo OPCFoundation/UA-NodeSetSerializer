@@ -1,6 +1,6 @@
 ﻿using Xml = Opc.Ua.Export;
-using Json = Opc.Ua.JsonNodeSet.Model;
-using Opc.Ua.JsonNodeSet;
+using Json = Opc.Ua.NodeSetSerializer.Model;
+using Opc.Ua.NodeSetSerializer;
 
 namespace NodeSetTool
 {

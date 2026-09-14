@@ -2,10 +2,10 @@
 
   <!--
     Self-contained on purpose. MSBuild stops at the FIRST Directory.Build.props it finds
-    walking up from a project, so this file - not the one in the UA-NodeSetTool repo root -
-    governs everything under UANodeSetSerializer. It must therefore carry the package metadata
-    outright rather than inheriting it: once this directory is replaced by a submodule
-    pointing at the public UANodeSetSerializer repository, there is no parent to inherit from.
+    walking up from a project, so this file - not anything in the hosting repo's root -
+    governs everything under NodeSetSerializer. It must therefore carry the package metadata
+    outright rather than inheriting it: this directory is a submodule pointing at the public
+    UA-NodeSetSerializer repository, so there is no parent to inherit from.
   -->
 
   <PropertyGroup>
@@ -13,8 +13,8 @@
     <Company>OPC Foundation</Company>
     <Copyright>Copyright © OPC Foundation</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/OPCFoundation/UANodeSetSerializer</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/OPCFoundation/UANodeSetSerializer</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/OPCFoundation/UA-NodeSetSerializer</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/OPCFoundation/UA-NodeSetSerializer</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 

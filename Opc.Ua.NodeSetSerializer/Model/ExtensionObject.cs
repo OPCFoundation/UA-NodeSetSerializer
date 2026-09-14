@@ -2,7 +2,7 @@ using System.Runtime.Serialization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace Opc.Ua.JsonNodeSet.Model;
+namespace Opc.Ua.NodeSetSerializer.Model;
 
 /// <summary>
 /// Part 6 §5.4 JSON ExtensionObject.

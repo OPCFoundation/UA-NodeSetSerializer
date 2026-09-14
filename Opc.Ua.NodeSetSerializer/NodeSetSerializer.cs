@@ -1,7 +1,7 @@
 ﻿using Xml = Opc.Ua.Export;
-using Json = Opc.Ua.JsonNodeSet.Model;
+using Json = Opc.Ua.NodeSetSerializer.Model;
 using Opc.Ua;
-using Opc.Ua.JsonNodeSet;
+using Opc.Ua.NodeSetSerializer;
 using System.Text;
 using System.Xml;
 using Newtonsoft.Json;
@@ -12,7 +12,7 @@ using SharpCompress.Common;
 using System.Formats.Tar;
 using System.Xml.Linq;
 using System.Collections.ObjectModel;
-using Opc.Ua.JsonNodeSet.Model;
+using Opc.Ua.NodeSetSerializer.Model;
 using System.Text.Json.Nodes;
 using System.Reflection.Metadata.Ecma335;
 
@@ -23,7 +23,7 @@ namespace NodeSetTool
         // internal, not private: the prototype format assemblies (JSONL, RDF/JSON-LD) are friends
         // of this one and need the loaded document. Internal rather than public keeps these out
         // of the package API, so they stay free to change as long as the friends change with them.
-        internal Opc.Ua.JsonNodeSet.AddressSpace? m_addressSpace;
+        internal Opc.Ua.NodeSetSerializer.AddressSpace? m_addressSpace;
         internal Dictionary<string, Json.ModelDefinition>? m_models;
         internal Dictionary<string, Json.UANode>? m_nodes;
         internal List<Json.UANode>? m_sequence;
@@ -2505,7 +2505,7 @@ namespace NodeSetTool
                         {
                             // Delegate to the shared converter so the full envelope (TypeId + Body)
                             // is parsed into a Json.ExtensionObject with a JObject body.
-                            return Opc.Ua.JsonNodeSet.VariantConverter
+                            return Opc.Ua.NodeSetSerializer.VariantConverter
                                 .ReadVariantFromXml(input, MakeVariantContext())?.Value;
                         }
 
@@ -2516,22 +2516,22 @@ namespace NodeSetTool
             return null;
         }
 
-        private Opc.Ua.JsonNodeSet.VariantXmlContext MakeVariantContext() =>
-            new Opc.Ua.JsonNodeSet.VariantXmlContext(m_context, m_addressSpace);
+        private Opc.Ua.NodeSetSerializer.VariantXmlContext MakeVariantContext() =>
+            new Opc.Ua.NodeSetSerializer.VariantXmlContext(m_context, m_addressSpace);
 
         /// <summary>
         /// Converts an OPC UA Value XmlElement to a JSON Variant. See
-        /// <see cref="Opc.Ua.JsonNodeSet.VariantConverter"/> for the full conversion contract.
+        /// <see cref="Opc.Ua.NodeSetSerializer.VariantConverter"/> for the full conversion contract.
         /// </summary>
         private Json.Variant? ToJsonVariant(XmlElement? input) =>
-            Opc.Ua.JsonNodeSet.VariantConverter.ReadVariantFromXml(input, MakeVariantContext());
+            Opc.Ua.NodeSetSerializer.VariantConverter.ReadVariantFromXml(input, MakeVariantContext());
 
         /// <summary>
         /// Converts a JSON Variant to an OPC UA Value XmlElement. Delegates to
-        /// <see cref="Opc.Ua.JsonNodeSet.VariantConverter"/>.
+        /// <see cref="Opc.Ua.NodeSetSerializer.VariantConverter"/>.
         /// </summary>
         private XmlElement? ToXmlVariant(Json.Variant? input) =>
-            Opc.Ua.JsonNodeSet.VariantConverter.WriteVariantToXml(input, MakeVariantContext());
+            Opc.Ua.NodeSetSerializer.VariantConverter.WriteVariantToXml(input, MakeVariantContext());
 
 #if LEGACY_TOXMLVARIANT
         private XmlElement? ToXmlVariantLegacy(Json.Variant? input)

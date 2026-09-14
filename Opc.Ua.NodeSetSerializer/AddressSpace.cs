@@ -1,6 +1,6 @@
-using Opc.Ua.JsonNodeSet.Model;
+using Opc.Ua.NodeSetSerializer.Model;
 
-namespace Opc.Ua.JsonNodeSet
+namespace Opc.Ua.NodeSetSerializer
 {
     public class ReferenceEntry
     {

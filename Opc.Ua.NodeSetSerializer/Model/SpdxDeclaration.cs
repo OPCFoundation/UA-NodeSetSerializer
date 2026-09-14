@@ -1,7 +1,7 @@
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
 
-namespace Opc.Ua.JsonNodeSet.Model;
+namespace Opc.Ua.NodeSetSerializer.Model;
 
 /// <summary>
 /// Licence/copyright metadata for a JSON NodeSet. The XML NodeSet carries the same information in

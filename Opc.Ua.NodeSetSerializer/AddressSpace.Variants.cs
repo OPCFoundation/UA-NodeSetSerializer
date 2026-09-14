@@ -1,7 +1,7 @@
 using Newtonsoft.Json.Linq;
-using Opc.Ua.JsonNodeSet.Model;
+using Opc.Ua.NodeSetSerializer.Model;
 
-namespace Opc.Ua.JsonNodeSet;
+namespace Opc.Ua.NodeSetSerializer;
 
 /// <summary>
 /// Variant canonicalization for <see cref="AddressSpace"/>.

@@ -2,9 +2,9 @@ using System.Globalization;
 using System.Text;
 using System.Xml;
 using Newtonsoft.Json.Linq;
-using Json = Opc.Ua.JsonNodeSet.Model;
+using Json = Opc.Ua.NodeSetSerializer.Model;
 
-namespace Opc.Ua.JsonNodeSet;
+namespace Opc.Ua.NodeSetSerializer;
 
 /// <summary>
 /// Converts OPC UA Variant / ExtensionObject values between XML (Part 6 §5.2) and

@@ -1,6 +1,6 @@
 using System.Runtime.Serialization;
 
-namespace Opc.Ua.JsonNodeSet.Model;
+namespace Opc.Ua.NodeSetSerializer.Model;
 
 /// <summary>
 /// Part 6 Annex I.9. The type of change applied when the Nodes in a ChangeSet are processed.

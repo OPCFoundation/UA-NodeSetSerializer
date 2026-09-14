@@ -1,4 +1,4 @@
-namespace Opc.Ua.JsonNodeSet
+namespace Opc.Ua.NodeSetSerializer
 {
     /// <summary>
     /// Validation and IRI encoding for canonical OPC UA NodeId / URI text.

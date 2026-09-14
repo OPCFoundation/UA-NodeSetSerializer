@@ -2,9 +2,9 @@ using System.IO;
 using System.Xml;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Json = Opc.Ua.JsonNodeSet.Model;
+using Json = Opc.Ua.NodeSetSerializer.Model;
 
-namespace Opc.Ua.JsonNodeSet;
+namespace Opc.Ua.NodeSetSerializer;
 
 /// <summary>
 /// Public facade over <see cref="VariantConverter"/> for converting OPC UA Variable

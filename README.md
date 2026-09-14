@@ -12,7 +12,7 @@ serialization component. It provides everything the OPC UA NodeSet Editor needs 
 
 * [`canonical-nodeid-encoding.md`](canonical-nodeid-encoding.md) — how NodeIds are encoded in the JSON form.
 * [`uri-percent-encoding.md`](uri-percent-encoding.md) — percent-encoding rules for URIs appearing in NodeIds.
-* [`Opc.Ua.NodeSetSerializer/json-nodeset-schema.json`](Opc.Ua.JsonNodeSet/json-nodeset-schema.json) — the JSON Schema for the encoding.
+* [`Opc.Ua.NodeSetSerializer/json-nodeset-schema.json`](Opc.Ua.NodeSetSerializer/json-nodeset-schema.json) — the JSON Schema for the encoding.
 
 ## Licence
 

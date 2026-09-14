@@ -1,6 +1,6 @@
 using System.Runtime.Serialization;
 
-namespace Opc.Ua.JsonNodeSet.Model;
+namespace Opc.Ua.NodeSetSerializer.Model;
 
 [DataContract]
 public class Reference

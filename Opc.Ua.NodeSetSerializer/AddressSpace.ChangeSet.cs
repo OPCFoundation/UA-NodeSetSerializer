@@ -1,8 +1,8 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Opc.Ua.JsonNodeSet.Model;
+using Opc.Ua.NodeSetSerializer.Model;
 
-namespace Opc.Ua.JsonNodeSet;
+namespace Opc.Ua.NodeSetSerializer;
 
 /// <summary>
 /// Part 6 Annex I ChangeSet processing.

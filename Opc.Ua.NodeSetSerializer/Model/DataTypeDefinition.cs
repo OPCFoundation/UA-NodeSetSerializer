@@ -1,6 +1,6 @@
 using System.Runtime.Serialization;
 
-namespace Opc.Ua.JsonNodeSet.Model;
+namespace Opc.Ua.NodeSetSerializer.Model;
 
 [DataContract]
 // The definition has no Name of its own: the BrowseName of the containing DataType is the

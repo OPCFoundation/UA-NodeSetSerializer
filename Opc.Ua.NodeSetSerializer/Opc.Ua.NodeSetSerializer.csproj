@@ -4,15 +4,15 @@
     <TargetFrameworks>net8.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>Opc.Ua.JsonNodeSet</RootNamespace>
-    <AssemblyName>Opc.Ua.JsonNodeSet</AssemblyName>
-    <Product>OPC UA JSON NodeSet Library</Product>
+    <RootNamespace>Opc.Ua.NodeSetSerializer</RootNamespace>
+    <AssemblyName>Opc.Ua.NodeSetSerializer</AssemblyName>
+    <Product>OPC UA NodeSet Serializer Library</Product>
     <Configurations>Debug;Release;Staging</Configurations>
   </PropertyGroup>
 
   <!-- NuGet package metadata -->
   <PropertyGroup>
-    <PackageId>Opc.Ua.JsonNodeSet</PackageId>
+    <PackageId>Opc.Ua.NodeSetSerializer</PackageId>
     <Description>Library for reading, writing, and converting OPC UA NodeSets between XML, JSON, and compressed archive formats.</Description>
     <PackageTags>OPC-UA;NodeSet;JSON;XML</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -27,7 +27,7 @@
          can resolve standard DataTypes (Argument, EUInformation, etc.) without the
          caller having to load Core explicitly. -->
     <EmbeddedResource Include="Resources\Opc.Ua.NodeSet2.Services.xml">
-      <LogicalName>Opc.Ua.JsonNodeSet.Resources.Opc.Ua.NodeSet2.Services.xml</LogicalName>
+      <LogicalName>Opc.Ua.NodeSetSerializer.Resources.Opc.Ua.NodeSet2.Services.xml</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 
@@ -39,8 +39,8 @@
     the friends change with them. The named assemblies are not part of this repository.
   -->
   <ItemGroup>
-    <InternalsVisibleTo Include="Opc.Ua.JsonNodeSet.Jsonl" />
-    <InternalsVisibleTo Include="Opc.Ua.JsonNodeSet.Rdf" />
+    <InternalsVisibleTo Include="Opc.Ua.NodeSetSerializer.Jsonl" />
+    <InternalsVisibleTo Include="Opc.Ua.NodeSetSerializer.Rdf" />
     <InternalsVisibleTo Include="Opc.Ua.NodeSetTool.Tests" />
   </ItemGroup>
 

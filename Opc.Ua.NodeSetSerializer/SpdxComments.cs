@@ -1,8 +1,8 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using Opc.Ua.JsonNodeSet.Model;
+using Opc.Ua.NodeSetSerializer.Model;
 
-namespace Opc.Ua.JsonNodeSet;
+namespace Opc.Ua.NodeSetSerializer;
 
 /// <summary>
 /// Moves the licence/copyright header between the two NodeSet encodings.
