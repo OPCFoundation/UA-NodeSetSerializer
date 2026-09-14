@@ -1,4 +1,4 @@
-# UANodeSetSerializer
+# OPC UA NodeSet Serializer
 
 `Opc.Ua.NodeSetSerializer` is a .NET class library that reads and writes OPC UA NodeSets in XML and JSON. It is the shared
 serialization component. It provides everything the OPC UA NodeSet Editor needs to load, edit and emit NodeSets lives here.
