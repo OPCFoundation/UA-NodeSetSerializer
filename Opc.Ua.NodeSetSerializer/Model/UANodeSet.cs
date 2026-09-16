@@ -13,32 +13,27 @@ public class UANodeSet
     [JsonProperty(Order = 1)]
     public SpdxDeclaration? SPDX { get; set; }
 
-    // If TRUE this UANodeSet is one document of a package and is ordered relative to the others: it
-    // may depend on a Node defined in a document that precedes it. META/package_metadata.json names
-    // the documents and fixes that order. The document is otherwise complete — it carries its own
-    // Models — so it still reads on its own, just not necessarily in isolation.
+    // The models formally defined by this UANodeSet, with their versions and dependencies. In a
+    // package they appear on the first document only: they describe the package as a whole, and a
+    // table that must be identical everywhere is better written once than copied.
     [DataMember]
     [JsonProperty(Order = 2)]
-    public bool? HasManifest { get; set; }
-
-    [DataMember]
-    [JsonProperty(Order = 3)]
     public List<ModelDefinition>? Models { get; set; }
 
     // Annex I.4. If TRUE the Nodes are changes to be applied to an existing model rather than a
     // model definition in their own right. ChangeSet = TRUE with Operation = Insert is equivalent
     // to ChangeSet = FALSE.
     [DataMember]
-    [JsonProperty(Order = 4)]
+    [JsonProperty(Order = 3)]
     public bool? ChangeSet { get; set; }
 
     // Annex I.4. The operation to apply when the file is processed. Only meaningful when
     // ChangeSet is TRUE; absent means Insert.
     [DataMember]
-    [JsonProperty(Order = 5)]
+    [JsonProperty(Order = 4)]
     public OperationType? Operation { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 6)]
+    [JsonProperty(Order = 5)]
     public UANodeSetNodes? Nodes { get; set; }
 }

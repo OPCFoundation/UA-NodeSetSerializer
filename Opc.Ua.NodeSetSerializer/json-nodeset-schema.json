@@ -19,11 +19,8 @@
         "SPDX": {
           "$ref": "#/$defs/SPDXDeclaration"
         },
-        "HasManifest": {
-          "description": "If TRUE a manifest file exists and this UANodeSet is part of a multi-file archive. The Models field is specified in the manifest and is not present here.",
-          "type": [ "boolean", "null" ]
-        },
         "Models": {
+          "description": "A list of models formally defined in the UANodeSet, including version information and dependencies. In a package they are specified on the first document only.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/ModelDefinition"
