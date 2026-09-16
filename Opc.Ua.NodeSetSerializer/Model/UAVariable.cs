@@ -7,30 +7,30 @@ namespace Opc.Ua.NodeSetSerializer.Model;
 public class UAVariable : UANode
 {
     [DataMember]
-    [JsonProperty(Order = 21)]
+    [JsonProperty(Order = 22)]
     public string? DataType { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 22)]
+    [JsonProperty(Order = 23)]
     public int? ValueRank { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 23)]
+    [JsonProperty(Order = 24)]
     public string? ArrayDimensions { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 24)]
+    [JsonProperty(Order = 25)]
     public Variant? Value { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 25)]
+    [JsonProperty(Order = 26)]
     public long? AccessLevel { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 26)]
+    [JsonProperty(Order = 27)]
     public decimal? MinimumSamplingInterval { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 27)]
+    [JsonProperty(Order = 28)]
     public bool? Historizing { get; set; }
 }

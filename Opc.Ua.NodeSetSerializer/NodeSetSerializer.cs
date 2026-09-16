@@ -7,8 +7,6 @@ using System.Xml;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.IO.Compression;
-using SharpCompress.Writers;
-using SharpCompress.Common;
 using System.Formats.Tar;
 using System.Xml.Linq;
 using System.Collections.ObjectModel;
@@ -343,74 +341,49 @@ namespace NodeSetTool
             return true;
         }
 
+        // A ChildList is the set of Nodes a Node owns, and the order they sit in carries nothing: the
+        // XML encoding has no ChildList at all, and the JSON one derives the order from whichever
+        // order the Nodes were read in. Since JSONL writes them in dependency order, that is no
+        // longer the order they were authored in — so the children are paired by NodeId rather than
+        // by position, and each pair compared in full.
         private bool Compare(Json.UANode? context, Json.ChildList? original, Json.ChildList? target)
         {
             if (original == null || target == null) return Object.ReferenceEquals(original, target);
 
-            if (original.Objects != null && target.Objects != null)
+            return CompareBucket("Objects", original.Objects, target.Objects)
+                && CompareBucket("Variables", original.Variables, target.Variables)
+                && CompareBucket("Methods", original.Methods, target.Methods);
+
+            bool CompareBucket<T>(string name, List<T>? left, List<T>? right) where T : Json.UANode
             {
-                if (original.Objects.Count != target.Objects.Count)
+                if (left == null || right == null) return left == null && right == null;
+
+                if (left.Count != right.Count)
                 {
-                    m_errors.Add(new CompareError(context, "ChildList.Objects.Count", original.Objects.Count, target.Objects.Count));
+                    m_errors.Add(new CompareError(context, $"ChildList.{name}.Count", left.Count, right.Count));
                     return false;
                 }
 
-                for (int ii = 0; ii < original.Objects.Count; ii++)
+                var byId = new Dictionary<string, T>(right.Count, StringComparer.Ordinal);
+
+                foreach (var child in right)
                 {
-                    if (original.Objects[ii] == null || target.Objects[ii] == null || !Compare(original.Objects[ii], target.Objects[ii]))
+                    if (child?.NodeId != null) byId[child.NodeId] = child;
+                }
+
+                foreach (var child in left)
+                {
+                    if (child?.NodeId == null || !byId.TryGetValue(child.NodeId, out var counterpart))
                     {
+                        m_errors.Add(new CompareError(context, $"ChildList.{name}.NodeId", child?.NodeId, null));
                         return false;
                     }
-                }
-            }
-            else if (original.Objects != null || target.Objects != null)
-            {
-                return false;
-            }
 
-            if (original.Variables != null && target.Variables != null)
-            {
-                if (original.Variables.Count != target.Variables.Count)
-                {
-                    m_errors.Add(new CompareError(context, "ChildList.Variables.Count", original.Variables.Count, target.Variables.Count));
-                    return false;
+                    if (!Compare(child, counterpart)) return false;
                 }
 
-                for (int ii = 0; ii < original.Variables.Count; ii++)
-                {
-                    if (original.Variables[ii] == null || target.Variables[ii] == null || !Compare(original.Variables[ii], target.Variables[ii]))
-                    {
-                        return false;
-                    }
-                }
+                return true;
             }
-            else if (original.Variables != null || target.Variables != null)
-            {
-                return false;
-            }
-
-            if (original.Methods != null && target.Methods != null)
-            {
-                if (original.Methods.Count != target.Methods.Count)
-                {
-                    m_errors.Add(new CompareError(context, "ChildList.Methods.Count", original.Methods.Count, target.Methods.Count));
-                    return false;
-                }
-
-                for (int ii = 0; ii < original.Methods.Count; ii++)
-                {
-                    if (original.Methods[ii] == null || target.Methods[ii] == null || !Compare(original.Methods[ii], target.Methods[ii]))
-                    {
-                        return false;
-                    }
-                }
-            }
-            else if (original.Methods != null || target.Methods != null)
-            {
-                return false;
-            }
-
-            return true;
         }
 
         private bool Compare(Json.UANode? context, IList<Json.Reference>? original, IList<Json.Reference>? target)
@@ -521,7 +494,7 @@ namespace NodeSetTool
         {
             get
             {
-                var formats = new List<string> { FormatXml, FormatJson, FormatArchive };
+                var formats = new List<string> { FormatXml, FormatJson };
                 foreach (var format in Formats())
                 {
                     if (format.CanWrite) formats.Add(format.Id);
@@ -532,7 +505,15 @@ namespace NodeSetTool
 
         public const string FormatXml = "xml";
         public const string FormatJson = "json";
-        public const string FormatArchive = "uanodeset";
+
+        /// <summary>
+        /// How much of a format's output goes in one file before it is split, for the formats that
+        /// split at all. Sixteen megabytes: large enough that the loss from restarting the
+        /// compressor at each boundary is under a tenth of a percent, small enough that even a very
+        /// large NodeSet yields enough pieces to compress them in parallel and to fetch one without
+        /// fetching the rest.
+        /// </summary>
+        public const int DefaultMaxBytesPerFile = 16 * 1024 * 1024;
 
         /// <summary>
         /// Writes the NodeSet in the named format. The single entry point callers should use:
@@ -544,17 +525,16 @@ namespace NodeSetTool
         /// to <see cref="Load(string)"/>; the format is stated rather than inferred, because on the
         /// way out the caller has already chosen it.
         /// </summary>
-        public void Save(string format, string filePath, int maxNodesPerFile = 10000)
+        public void Save(string format, string filePath, int maxBytesPerFile = DefaultMaxBytesPerFile)
         {
-            // Dispatched on the path rather than through Save(format, Stream): each built-in has a
-            // file overload whose behaviour depends on the name (SaveArchive compresses), and a
-            // registered format may too (JSONL gzips on a .gz suffix). Opening the stream here and
-            // handing it over would silently drop that.
+            // Dispatched on the path rather than through Save(format, Stream): a registered format's
+            // file overload may depend on the name (JSONL gzips on a .gz suffix, and the package
+            // writer needs somewhere to put its entries). Opening the stream here and handing it
+            // over would silently drop that.
             switch (format)
             {
                 case FormatXml: SaveXml(filePath); return;
                 case FormatJson: SaveJson(filePath); return;
-                case FormatArchive: SaveArchive(filePath, maxNodesPerFile); return;
             }
 
             var handler = FindFormat(format);
@@ -565,12 +545,12 @@ namespace NodeSetTool
                     $"Format '{format}' is not supported by this build. Supported: {string.Join(", ", SupportedFormats)}.");
             }
 
-            handler.WriteFile(this, filePath, maxNodesPerFile);
+            handler.WriteFile(this, filePath, maxBytesPerFile);
         }
 
-        public void Save(string format, Stream stream, int maxNodesPerFile = 10000)
+        public void Save(string format, Stream stream, int maxBytesPerFile = DefaultMaxBytesPerFile)
         {
-            if (!SaveAsFormat(format, stream, maxNodesPerFile))
+            if (!SaveAsFormat(format, stream, maxBytesPerFile))
             {
                 throw new NotSupportedException(
                     $"Format '{format}' is not supported by this build. Supported: {string.Join(", ", SupportedFormats)}.");
@@ -581,14 +561,13 @@ namespace NodeSetTool
         /// Writes <paramref name="format"/> and returns true, or returns false if unrecognized.
         /// The built-in encodings are handled here; anything else is offered to the registry.
         /// </summary>
-        private bool SaveAsFormat(string format, Stream stream, int maxNodesPerFile)
+        private bool SaveAsFormat(string format, Stream stream, int maxBytesPerFile)
         {
             switch (format)
             {
                 case FormatXml: SaveXml(stream); return true;
                 case FormatJson: SaveJson(stream); return true;
-                case FormatArchive: SaveArchive(stream, maxNodesPerFile); return true;
-                default: return TrySaveRegistered(format, stream, maxNodesPerFile);
+                default: return TrySaveRegistered(format, stream, maxBytesPerFile);
             }
         }
 
@@ -613,11 +592,6 @@ namespace NodeSetTool
                 LoadJson(filePath);
                 return;
             }
-            else if (filePath.EndsWith(".tar.gz") || filePath.EndsWith(".uanodeset"))
-            {
-                LoadArchive(filePath);
-                return;
-            }
 
             if (IsValidXml(filePath))
             {
@@ -626,7 +600,7 @@ namespace NodeSetTool
             }
 
             // Ahead of the JSON check: a JSONL document is a sequence of JSON values rather than one,
-            // so IsValidJson rejects it and it would fall through to the archive reader.
+            // so IsValidJson rejects it, and a package is a ZIP that IsValidJson cannot read either.
             if (TryLoadRegisteredByContent(filePath))
             {
                 return;
@@ -638,7 +612,9 @@ namespace NodeSetTool
                 return;
             }
 
-            LoadArchive(filePath);
+            throw new InvalidDataException(
+                $"'{filePath}' is not a NodeSet in any format this build can read. " +
+                $"Supported: {String.Join(", ", SupportedFormats)}.");
         }
 
         private static bool IsValidXml(string filePath)
@@ -783,192 +759,6 @@ namespace NodeSetTool
             {
                 m_aliases[alias.Alias] = alias.NodeId;
             }
-        }
-
-        public void LoadArchive(string filePath)
-        {
-            LoadWellKnownAliases();
-
-            // Read every entry up front: tar is sequential, but the manifest decides the processing
-            // order and is not guaranteed to be the entry that appears first.
-            Dictionary<string, byte[]> entries = new(StringComparer.Ordinal);
-
-            using (FileStream fs = File.OpenRead(filePath))
-            using (GZipStream gzipStream = new GZipStream(fs, CompressionMode.Decompress))
-            using (TarReader tarReader = new TarReader(gzipStream))
-            {
-                TarEntry? entry;
-
-                while ((entry = tarReader.GetNextEntry()) != null)
-                {
-                    if (entry.EntryType == TarEntryType.V7RegularFile || entry.EntryType == TarEntryType.RegularFile)
-                    {
-                        using var ms = new MemoryStream();
-                        entry.DataStream!.CopyTo(ms);
-                        entries[entry.Name] = ms.ToArray();
-                    }
-                }
-            }
-
-            Json.Manifest? manifest = null;
-
-            if (entries.TryGetValue(ManifestFileName, out var manifestBytes))
-            {
-                manifest = FromArchiveEntry<Json.Manifest>(manifestBytes);
-                entries.Remove(ManifestFileName);
-            }
-
-            // Without a manifest the entry order is all there is to go on. Archives written by this
-            // tool always carry one; the fallback keeps hand-assembled archives readable.
-            var order = manifest?.Files ?? entries.Keys.ToList();
-
-            List<Json.UANodeSet> files = new();
-
-            foreach (var name in order)
-            {
-                if (!entries.TryGetValue(name, out var bytes))
-                {
-                    throw new InvalidDataException($"The archive manifest names '{name}', which is not in the archive.");
-                }
-
-                files.Add(FromArchiveEntry<Json.UANodeSet>(bytes));
-                entries.Remove(name);
-            }
-
-            if (manifest != null && entries.Count > 0)
-            {
-                throw new InvalidDataException($"The archive contains files the manifest does not name: {String.Join(", ", entries.Keys)}.");
-            }
-
-            Json.UANodeSet nodeset = new Json.UANodeSet();
-            nodeset.Models = manifest?.Models;
-
-            foreach (var file in files)
-            {
-                if (nodeset.SPDX == null) nodeset.SPDX = file.SPDX;
-                if (nodeset.Models == null) nodeset.Models = file.Models;
-                if (nodeset.Nodes == null) nodeset.Nodes = new();
-
-                if (file.Nodes!.ReferenceTypes != null)
-                {
-                    if (nodeset.Nodes!.ReferenceTypes == null) nodeset.Nodes.ReferenceTypes = new();
-                    nodeset.Nodes.ReferenceTypes.AddRange(file.Nodes.ReferenceTypes);
-                }
-
-                if (file.Nodes.DataTypes != null)
-                {
-                    if (nodeset.Nodes!.DataTypes == null) nodeset.Nodes.DataTypes = new();
-                    nodeset.Nodes.DataTypes.AddRange(file.Nodes.DataTypes);
-                }
-
-                if (file.Nodes.VariableTypes != null)
-                {
-                    if (nodeset.Nodes!.VariableTypes == null) nodeset.Nodes.VariableTypes = new();
-                    nodeset.Nodes.VariableTypes.AddRange(file.Nodes.VariableTypes);
-                }
-
-                if (file.Nodes.ObjectTypes != null)
-                {
-                    if (nodeset.Nodes!.ObjectTypes == null) nodeset.Nodes.ObjectTypes = new();
-                    nodeset.Nodes.ObjectTypes.AddRange(file.Nodes.ObjectTypes);
-                }
-
-                if (file.Nodes.Variables != null)
-                {
-                    if (nodeset.Nodes!.Variables == null) nodeset.Nodes.Variables = new();
-                    nodeset.Nodes.Variables.AddRange(file.Nodes.Variables);
-                }
-
-                if (file.Nodes.Methods != null)
-                {
-                    if (nodeset.Nodes!.Methods == null) nodeset.Nodes.Methods = new();
-                    nodeset.Nodes.Methods.AddRange(file.Nodes.Methods);
-                }
-
-                if (file.Nodes.Objects != null)
-                {
-                    if (nodeset.Nodes!.Objects == null) nodeset.Nodes.Objects = new();
-                    nodeset.Nodes.Objects.AddRange(file.Nodes.Objects);
-                }
-
-                if (file.Nodes.Views != null)
-                {
-                    if (nodeset.Nodes!.Views == null) nodeset.Nodes.Views = new();
-                    nodeset.Nodes.Views.AddRange(file.Nodes.Views);
-                }
-            }
-
-            ValidateLoadedJson(nodeset);
-            IndexFile(nodeset);
-        }
-
-        private static T FromArchiveEntry<T>(byte[] bytes)
-        {
-            using var ms = new MemoryStream(bytes);
-            using var js = new StreamReader(ms);
-            using var reader = new JsonTextReader(js);
-
-            var serializer = new JsonSerializer();
-            return serializer.Deserialize<T>(reader)!;
-        }
-
-        public void SaveArchive(string filePath, int maxNodesPerFile)
-        {
-            ValidateForSave();
-            if (File.Exists(filePath)) File.Delete(filePath);
-
-            var nodeset = BuildJson();
-            var (manifest, files) = Package(nodeset, maxNodesPerFile);
-
-            using (FileStream fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
-            using (GZipStream gzipStream = new GZipStream(fileStream, CompressionLevel.Optimal))
-            using (var tarWriter = WriterFactory.OpenWriter(gzipStream, ArchiveType.Tar, WriterOptions.ForTar(CompressionType.None)))
-            {
-                WriteArchive(tarWriter, manifest, files);
-            }
-        }
-
-        // The manifest is written first so a reader can learn the processing order before it reaches
-        // any of the files it names.
-        private static void WriteArchive(IWriter tarWriter, Json.Manifest manifest, List<Json.UANodeSet> files)
-        {
-            var serializer = new JsonSerializer
-            {
-                Formatting = Newtonsoft.Json.Formatting.None,
-                NullValueHandling = NullValueHandling.Ignore,
-                DefaultValueHandling = DefaultValueHandling.Ignore,
-            };
-
-            WriteArchiveEntry(tarWriter, serializer, ManifestFileName, manifest);
-
-            for (int ii = 0; ii < files.Count; ii++)
-            {
-                WriteArchiveEntry(tarWriter, serializer, manifest.Files![ii], files[ii]);
-            }
-        }
-
-        private static void WriteArchiveEntry(IWriter tarWriter, JsonSerializer serializer, string entryName, object content)
-        {
-            using var memoryStream = new MemoryStream();
-            using var jsonStream = new StreamWriter(memoryStream);
-            using var writer = new JsonTextWriter(jsonStream);
-
-            serializer.Serialize(writer, content);
-            writer.Flush();
-            memoryStream.Seek(0, SeekOrigin.Begin);
-            tarWriter.Write(entryName, memoryStream, null); // null = use defaults for entry metadata
-        }
-
-        public void SaveArchive(Stream stream, int maxNodesPerFile)
-        {
-            ValidateForSave();
-            var nodeset = BuildJson();
-            var (manifest, files) = Package(nodeset, maxNodesPerFile);
-
-            using var gzipStream = new GZipStream(stream, CompressionLevel.Optimal, leaveOpen: true);
-            using var tarWriter = WriterFactory.OpenWriter(gzipStream, ArchiveType.Tar, WriterOptions.ForTar(CompressionType.None));
-
-            WriteArchive(tarWriter, manifest, files);
         }
 
         private void IndexChildren(Json.UANode parent)
@@ -1314,16 +1104,10 @@ namespace NodeSetTool
                 }
             }
 
-            nodeset.Nodes.ReferenceTypes = SortBySuperType(nodeset.Nodes.ReferenceTypes);
-            nodeset.Nodes.DataTypes = SortBySuperType(nodeset.Nodes.DataTypes);
-            nodeset.Nodes.VariableTypes = SortBySuperType(nodeset.Nodes.VariableTypes);
-            nodeset.Nodes.ObjectTypes = SortBySuperType(nodeset.Nodes.ObjectTypes);
-
-            // The lists are final, so the emission order is known and the remaining forward
-            // references can be pre-declared. Only with those in hand is Ordered true.
-            nodeset.Declarations = BuildDeclarations(nodeset);
-            nodeset.Ordered = true;
-
+            // The lists are left in document order. The eight NodeContainer properties are the shape
+            // of a JSON document, not an ordering rule: a .json NodeSet is decoded by loading the
+            // whole document, so nothing it holds has to read backwards. Ordering is the JSONL
+            // layout's problem, and it solves it there — see JsonlDependencyOrder.
             return nodeset;
         }
 
@@ -1416,294 +1200,6 @@ namespace NodeSetTool
             }
 
             return null;
-        }
-
-        // Orders a list of type nodes so a subtype always follows the type it derives from, which lets
-        // a reader resolve a supertype without looking ahead. The sort is stable: a node keeps its
-        // position unless a supertype in the same list comes later, in which case that supertype (and
-        // its own supertypes) move ahead of it. Supertypes in another model, and cycles in a malformed
-        // NodeSet, are left alone.
-        private static List<T>? SortBySuperType<T>(List<T>? nodes) where T : Json.UANode
-        {
-            if (nodes == null || nodes.Count < 2)
-            {
-                return nodes;
-            }
-
-            var byId = new Dictionary<string, T>();
-
-            foreach (var node in nodes)
-            {
-                if (node.NodeId != null && !byId.ContainsKey(node.NodeId))
-                {
-                    byId.Add(node.NodeId, node);
-                }
-            }
-
-            var sorted = new List<T>(nodes.Count);
-            var emitted = new HashSet<T>();
-            var visiting = new HashSet<T>();
-
-            void Emit(T node)
-            {
-                if (emitted.Contains(node) || !visiting.Add(node))
-                {
-                    return;
-                }
-
-                var superTypeId = FindSuperTypeId(node);
-
-                if (superTypeId != null && byId.TryGetValue(superTypeId, out var superType) && !ReferenceEquals(superType, node))
-                {
-                    Emit(superType);
-                }
-
-                visiting.Remove(node);
-                emitted.Add(node);
-                sorted.Add(node);
-            }
-
-            foreach (var node in nodes)
-            {
-                Emit(node);
-            }
-
-            return sorted;
-        }
-
-        // The name of the archive entry that lists the files and carries the Models. Every other
-        // entry in the archive must be named by it.
-        public const string ManifestFileName = Json.Manifest.FileName;
-
-        private static string ArchiveFileName(int index) => $"UANodeSet_{index + 1:D3}.json";
-
-        private Json.UANodeSet NewFile(Json.UANodeSet nodeset, int currentFileCount)
-        {
-            // Models and Declarations live in the manifest, so a member file only flags that one
-            // exists and carries its share of the Nodes. The split preserves the order the Nodes
-            // were in, so each file is as ordered as the whole.
-            return new Json.UANodeSet()
-            {
-                Ordered = nodeset.Ordered,
-                HasManifest = true,
-                Nodes = new()
-            };
-        }
-
-        private int CountNodes(Json.UANode node)
-        {
-            if (node?.Children == null)
-            {
-                return 1;
-            }
-
-            int count = 1;
-
-            if (node.Children.Objects != null)
-            {
-                foreach (var child in node.Children.Objects)
-                {
-                    count += CountNodes(child);
-                }
-            }
-
-            if (node.Children.Variables != null)
-            {
-                foreach (var child in node.Children.Variables)
-                {
-                    count += CountNodes(child);
-                }
-            }
-
-            if (node.Children.Methods != null)
-            {
-                foreach (var child in node.Children.Methods)
-                {
-                    count += CountNodes(child);
-                }
-            }
-
-            return count;
-        }
-
-
-        private (Json.Manifest Manifest, List<Json.UANodeSet> Files) Package(Json.UANodeSet nodeset, int maxNodesPerFile)
-        {
-            List<Json.UANodeSet> files = new List<Json.UANodeSet>();
-
-            int count = 0;
-
-            Json.UANodeSet current = NewFile(nodeset, files.Count);
-            // The SPDX declaration, unlike Models, is not part of the manifest, so it goes on the
-            // first file of the archive.
-            current.SPDX = nodeset.SPDX;
-
-            if (nodeset.Nodes!.ReferenceTypes != null)
-            {
-                current.Nodes!.ReferenceTypes = new();
-
-                foreach (var node in nodeset.Nodes.ReferenceTypes)
-                {
-                    current.Nodes!.ReferenceTypes.Add(node);
-                    count += CountNodes(node);
-
-                    if (count > maxNodesPerFile)
-                    {
-                        files.Add(current);
-                        current = NewFile(nodeset, files.Count);
-                        current.Nodes!.ReferenceTypes = new();
-                        count = 0;
-                    }
-                }
-            }
-
-            if (nodeset.Nodes!.DataTypes != null)
-            {
-                current.Nodes!.DataTypes = new();
-
-                foreach (var node in nodeset.Nodes.DataTypes)
-                {
-                    current.Nodes!.DataTypes.Add(node);
-                    count += CountNodes(node);
-
-                    if (count > maxNodesPerFile)
-                    {
-                        files.Add(current);
-                        current = NewFile(nodeset, files.Count);
-                        current.Nodes!.DataTypes = new();
-                        count = 0;
-                    }
-                }
-            }
-
-            if (nodeset.Nodes!.VariableTypes != null)
-            {
-                current.Nodes!.VariableTypes = new();
-
-                foreach (var node in nodeset.Nodes.VariableTypes)
-                {
-                    current.Nodes!.VariableTypes.Add(node);
-                    count += CountNodes(node);
-
-                    if (count > maxNodesPerFile)
-                    {
-                        files.Add(current);
-                        current = NewFile(nodeset, files.Count);
-                        current.Nodes!.VariableTypes = new();
-                        count = 0;
-                    }
-                }
-            }
-
-            if (nodeset.Nodes!.ObjectTypes != null)
-            {
-                current.Nodes!.ObjectTypes = new();
-
-                foreach (var node in nodeset.Nodes.ObjectTypes)
-                {
-                    current.Nodes!.ObjectTypes.Add(node);
-                    count += CountNodes(node);
-
-                    if (count > maxNodesPerFile)
-                    {
-                        files.Add(current);
-                        current = NewFile(nodeset, files.Count);
-                        current.Nodes!.ObjectTypes = new();
-                        count = 0;
-                    }
-                }
-            }
-
-            if (nodeset.Nodes!.Variables != null)
-            {
-                current.Nodes!.Variables = new();
-
-                foreach (var node in nodeset.Nodes.Variables)
-                {
-                    current.Nodes!.Variables.Add(node);
-                    count += CountNodes(node);
-
-                    if (count > maxNodesPerFile)
-                    {
-                        files.Add(current);
-                        current = NewFile(nodeset, files.Count);
-                        current.Nodes!.Variables = new();
-                        count = 0;
-                    }
-                }
-            }
-
-            if (nodeset.Nodes!.Methods != null)
-            {
-                current.Nodes!.Methods = new();
-
-                foreach (var node in nodeset.Nodes.Methods)
-                {
-                    current.Nodes!.Methods.Add(node);
-                    count += CountNodes(node);
-
-                    if (count > maxNodesPerFile)
-                    {
-                        files.Add(current);
-                        current = NewFile(nodeset, files.Count);
-                        current.Nodes!.Methods = new();
-                        count = 0;
-                    }
-                }
-            }
-
-            if (nodeset.Nodes!.Objects != null)
-            {
-                current.Nodes!.Objects = new();
-
-                foreach (var node in nodeset.Nodes.Objects)
-                {
-                    current.Nodes!.Objects.Add(node);
-                    count += CountNodes(node);
-
-                    if (count > maxNodesPerFile)
-                    {
-                        files.Add(current);
-                        current = NewFile(nodeset, files.Count);
-                        current.Nodes!.Objects = new();
-                        count = 0;
-                    }
-                }
-            }
-
-            if (nodeset.Nodes!.Views != null)
-            {
-                current.Nodes!.Views = new();
-
-                foreach (var node in nodeset.Nodes.Views)
-                {
-                    current.Nodes!.Views.Add(node);
-                    count += CountNodes(node);
-
-                    if (count > maxNodesPerFile)
-                    {
-                        files.Add(current);
-                        current = NewFile(nodeset, files.Count);
-                        current.Nodes!.Views = new();
-                        count = 0;
-                    }
-                }
-            }
-
-            files.Add(current);
-
-            // Splitting the Nodes across files only makes forward references longer-range, never
-            // fewer, so the whole-document Declarations carry over unchanged — to the manifest,
-            // which is read before any of the files it names.
-            var manifest = new Json.Manifest()
-            {
-                Ordered = nodeset.Ordered,
-                Models = nodeset.Models,
-                Declarations = nodeset.Declarations,
-                Files = Enumerable.Range(0, files.Count).Select(ArchiveFileName).ToList()
-            };
-
-            return (manifest, files);
         }
 
         private void Initialize(Opc.Ua.Export.UANodeSet input)

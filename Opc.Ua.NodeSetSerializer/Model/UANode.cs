@@ -6,7 +6,7 @@ namespace Opc.Ua.NodeSetSerializer.Model;
 /// <summary>
 /// Base type for all OPC UA Nodes. NodeId, NodeClass and BrowseName are mandatory and are emitted
 /// first, so a decoder can register a Node before reading the fields that may refer back to it.
-/// Subtypes continue the Order sequence from 21.
+/// Subtypes continue the Order sequence from 22.
 /// </summary>
 [DataContract]
 public class UANode
@@ -23,8 +23,18 @@ public class UANode
     [JsonProperty(Order = 3)]
     public string? BrowseName { get; set; }
 
+    /// <summary>
+    /// Marks a stub that registers a Node the document defines later, so a sequential decoder can
+    /// resolve a circular dependency without looking ahead. A declaration carries NodeId, NodeClass
+    /// and BrowseName and nothing else, and the Node it names must appear in full further on. Used
+    /// by the JSONL layout, where a declaration is a line of its own.
+    /// </summary>
     [DataMember]
     [JsonProperty(Order = 4)]
+    public bool? IsDeclaration { get; set; }
+
+    [DataMember]
+    [JsonProperty(Order = 5)]
     public string? SymbolicName { get; set; }
 
     /// <summary>
@@ -33,66 +43,66 @@ public class UANode
     /// ChildList, where the owner is always the containing Node.
     /// </summary>
     [DataMember]
-    [JsonProperty(Order = 5)]
+    [JsonProperty(Order = 6)]
     public string? ParentId { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 6)]
+    [JsonProperty(Order = 7)]
     public string? TypeId { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 7)]
+    [JsonProperty(Order = 8)]
     public string? ModellingRuleId { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 8)]
+    [JsonProperty(Order = 9)]
     public LocalizedText? DisplayName { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 9)]
+    [JsonProperty(Order = 10)]
     public ReleaseStatus? ReleaseStatus { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 10)]
+    [JsonProperty(Order = 11)]
     public string? Documentation { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 11)]
+    [JsonProperty(Order = 12)]
     public LocalizedText? Description { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 12)]
+    [JsonProperty(Order = 13)]
     public bool? IsAbstract { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 13)]
+    [JsonProperty(Order = 14)]
     public long? WriteMask { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 14)]
+    [JsonProperty(Order = 15)]
     public List<RolePermission>? RolePermissions { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 15)]
+    [JsonProperty(Order = 16)]
     public long? AccessRestrictions { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 16)]
+    [JsonProperty(Order = 17)]
     public bool? HasNoPermissions { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 17)]
+    [JsonProperty(Order = 18)]
     public bool? DesignToolOnly { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 18)]
+    [JsonProperty(Order = 19)]
     public ChildList? Children { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 19)]
+    [JsonProperty(Order = 20)]
     public List<Reference>? References { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 20)]
+    [JsonProperty(Order = 21)]
     public List<string>? ConformanceUnits { get; set; }
 }

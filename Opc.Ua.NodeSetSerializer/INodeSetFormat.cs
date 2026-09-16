@@ -50,7 +50,7 @@ namespace NodeSetTool
         void Read(string filePath, NodeSetSerializer target);
 
         /// <summary>Writes <paramref name="source"/> to <paramref name="output"/>.</summary>
-        void Write(NodeSetSerializer source, Stream output, int maxNodesPerFile);
+        void Write(NodeSetSerializer source, Stream output, int maxBytesPerFile);
 
         /// <summary>
         /// Writes <paramref name="source"/> to a file. Override only when the container depends on
@@ -58,10 +58,10 @@ namespace NodeSetTool
         /// a bare stream cannot know. The default simply opens the file and calls
         /// <see cref="Write"/>.
         /// </summary>
-        void WriteFile(NodeSetSerializer source, string filePath, int maxNodesPerFile)
+        void WriteFile(NodeSetSerializer source, string filePath, int maxBytesPerFile)
         {
             using var stream = File.Open(filePath, FileMode.Create, FileAccess.Write);
-            Write(source, stream, maxNodesPerFile);
+            Write(source, stream, maxBytesPerFile);
         }
     }
 }

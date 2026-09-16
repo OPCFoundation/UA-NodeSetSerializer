@@ -7,6 +7,6 @@ namespace Opc.Ua.NodeSetSerializer.Model;
 public class UAObject : UANode
 {
     [DataMember]
-    [JsonProperty(Order = 21)]
+    [JsonProperty(Order = 22)]
     public int? EventNotifier { get; set; }
 }

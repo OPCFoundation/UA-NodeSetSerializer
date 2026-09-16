@@ -7,10 +7,10 @@ namespace Opc.Ua.NodeSetSerializer.Model;
 public class UAReferenceType : UANode
 {
     [DataMember]
-    [JsonProperty(Order = 21)]
+    [JsonProperty(Order = 22)]
     public bool? Symmetric { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 22)]
+    [JsonProperty(Order = 23)]
     public LocalizedText? InverseName { get; set; }
 }

@@ -7,10 +7,10 @@ namespace Opc.Ua.NodeSetSerializer.Model;
 public class UAView : UANode
 {
     [DataMember]
-    [JsonProperty(Order = 21)]
+    [JsonProperty(Order = 22)]
     public int? EventNotifier { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 22)]
+    [JsonProperty(Order = 23)]
     public bool? ContainsNoLoops { get; set; }
 }

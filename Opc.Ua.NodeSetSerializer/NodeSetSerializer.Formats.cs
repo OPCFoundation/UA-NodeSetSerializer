@@ -83,7 +83,7 @@ namespace NodeSetTool
             return false;
         }
 
-        private bool TrySaveRegistered(string format, Stream stream, int maxNodesPerFile)
+        private bool TrySaveRegistered(string format, Stream stream, int maxBytesPerFile)
         {
             var handler = FindFormat(format);
 
@@ -92,7 +92,7 @@ namespace NodeSetTool
                 return false;
             }
 
-            handler.Write(this, stream, maxNodesPerFile);
+            handler.Write(this, stream, maxBytesPerFile);
             return true;
         }
     }

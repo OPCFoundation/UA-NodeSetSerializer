@@ -19,12 +19,8 @@
         "SPDX": {
           "$ref": "#/$defs/SPDXDeclaration"
         },
-        "Ordered": {
-          "description": "If TRUE the order of Nodes is guaranteed to follow the requirements in Annex I.2. An absent field is equivalent to FALSE and asserts nothing.",
-          "type": [ "boolean", "null" ]
-        },
         "HasManifest": {
-          "description": "If TRUE a manifest file exists and this UANodeSet is part of a multi-file archive. The Models and Declarations fields are specified in the manifest and are not present here.",
+          "description": "If TRUE a manifest file exists and this UANodeSet is part of a multi-file archive. The Models field is specified in the manifest and is not present here.",
           "type": [ "boolean", "null" ]
         },
         "Models": {
@@ -44,13 +40,6 @@
             { "type": "null" }
           ]
         },
-        "Declarations": {
-          "description": "Nodes needed to resolve recursive relationships. Only the mandatory fields of UANode are specified. Only present if Ordered is TRUE and recursive relationships exist.",
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/UANode"
-          }
-        },
         "Nodes": {
           "$ref": "#/$defs/NodeContainer"
         }
@@ -60,21 +49,10 @@
       "description": "The manifest.json entry of a multi-file archive. It specifies the order in which the archive's files are processed. Any file in the archive that is not referenced by the manifest is an error.",
       "type": "object",
       "properties": {
-        "Ordered": {
-          "description": "If TRUE, the set of files follows the ordering rules defined in Annex I.2.",
-          "type": [ "boolean", "null" ]
-        },
         "Models": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/ModelDefinition"
-          }
-        },
-        "Declarations": {
-          "description": "Nodes needed to resolve recursive relationships. Only the mandatory fields of UANode are specified. Only present if Ordered is TRUE and recursive relationships exist.",
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/UANode"
           }
         },
         "Files": {
@@ -250,6 +228,10 @@
         },
         "BrowseName": {
           "type": "string"
+        },
+        "IsDeclaration": {
+          "description": "If TRUE the Node is a stub that registers a Node the document defines later, so a sequential decoder can resolve a circular dependency without looking ahead. A declaration specifies NodeId, NodeClass and BrowseName and nothing else, and the Node it names must appear in full further on. Used by the JSONL layout, where a declaration is a line of its own.",
+          "type": [ "boolean", "null" ]
         },
         "SymbolicName": {
           "type": "string"
