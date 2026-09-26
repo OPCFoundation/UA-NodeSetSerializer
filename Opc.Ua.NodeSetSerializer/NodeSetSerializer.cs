@@ -2672,6 +2672,13 @@ namespace NodeSetTool
 
             // Ensure any newly discovered namespace URIs are added as RequiredModels
             // so the address space validator accepts them on reload.
+            //
+            // Values are deliberately NOT walked here. The NodeIds they carry (an
+            // ExtensionObject TypeId, a NodeId/QualifiedName field) are opaque identifiers per
+            // Part 6, so their namespaces must not become RequiredModels — and they do not need
+            // registering either: BuildXml assigns NamespaceUris from the context AFTER writing
+            // the nodes, so a URI the writer appends on its way past a value is already in the
+            // emitted table, at the index the value uses.
             var allRegisteredUris = new HashSet<string>(m_context!.NamespaceUris!.ToArray() ?? []);
 
             foreach (var model in m_models!.Values)

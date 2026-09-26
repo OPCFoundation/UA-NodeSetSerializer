@@ -23,10 +23,21 @@ public static class Part6Variant
     /// <para>Schema-free: pass null for <paramref name="addressSpace"/>. Schema-aware:
     /// pass the AddressSpace holding the relevant DataTypeDefinitions; the result will
     /// already be canonicalized for known DataTypes.</para>
+    ///
+    /// <para><paramref name="namespaceUris"/> is the containing NodeSet's
+    /// <c>NamespaceUris</c> table, in document order, with the Core namespace implicit at
+    /// index 0 — the same contract as <see cref="WriteJsonValue"/>. Without it the reader
+    /// has no way to tell what a <c>ns=N</c> inside the value refers to and has to leave
+    /// the document-local index in place, which then means whatever index N happens to be
+    /// in the NEXT document the value is written into. Pass it for any value that can
+    /// contain a NodeId / ExpandedNodeId / QualifiedName — including the
+    /// <c>ExtensionObject</c> TypeId, which every Structure value carries.</para>
     /// </summary>
-    public static string? ReadXmlValueAsJsonText(XmlElement? xml, AddressSpace? addressSpace = null)
+    public static string? ReadXmlValueAsJsonText(
+        XmlElement? xml, AddressSpace? addressSpace = null,
+        IReadOnlyList<string>? namespaceUris = null)
     {
-        var token = ReadXmlValueAsToken(xml, addressSpace);
+        var token = ReadXmlValueAsToken(xml, addressSpace, namespaceUris);
         return token == null ? null : token.ToString(Newtonsoft.Json.Formatting.None);
     }
 
@@ -35,12 +46,33 @@ public static class Part6Variant
     /// <see cref="JToken"/> (skipping the text round-trip). For internal callers that
     /// already use Newtonsoft.
     /// </summary>
-    public static JToken? ReadXmlValueAsToken(XmlElement? xml, AddressSpace? addressSpace = null)
+    public static JToken? ReadXmlValueAsToken(
+        XmlElement? xml, AddressSpace? addressSpace = null,
+        IReadOnlyList<string>? namespaceUris = null)
     {
         if (xml == null) return null;
-        var ctx = new VariantXmlContext(new ServiceMessageContext(), addressSpace);
+        var ctx = new VariantXmlContext(CreateMessageContext(namespaceUris), addressSpace);
         var v = VariantConverter.ReadVariantFromXml(xml, ctx);
         return ToPart6JsonValue(v);
+    }
+
+    /// <summary>
+    /// A namespace table for resolving <c>ns=N</c> ↔ <c>nsu=URI</c> inside a value.
+    /// <paramref name="namespaceUris"/> is the NodeSet's <c>NamespaceUris</c> element in
+    /// document order; index 0 is the implicit Core namespace and is never listed there.
+    /// </summary>
+    private static ServiceMessageContext CreateMessageContext(IReadOnlyList<string>? namespaceUris)
+    {
+        var msgContext = new ServiceMessageContext();
+        if (namespaceUris != null)
+        {
+            foreach (var uri in namespaceUris)
+            {
+                if (string.IsNullOrEmpty(uri)) continue;
+                msgContext.NamespaceUris.GetIndexOrAppend(uri);
+            }
+        }
+        return msgContext;
     }
 
     /// <summary>
@@ -94,17 +126,7 @@ public static class Part6Variant
     {
         if (part6Value == null || part6Value.Type == JTokenType.Null) return null;
 
-        var msgContext = new ServiceMessageContext();
-        if (namespaceUris != null)
-        {
-            foreach (var uri in namespaceUris)
-            {
-                if (string.IsNullOrEmpty(uri)) continue;
-                msgContext.NamespaceUris.GetIndexOrAppend(uri);
-            }
-        }
-
-        var ctx = new VariantXmlContext(msgContext, addressSpace);
+        var ctx = new VariantXmlContext(CreateMessageContext(namespaceUris), addressSpace);
         var variant = FromPart6JsonValue(part6Value, ctx, dataTypeNodeId);
         return variant == null ? null : VariantConverter.WriteVariantToXml(variant, ctx);
     }
