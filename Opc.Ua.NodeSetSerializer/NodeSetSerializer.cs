@@ -1059,7 +1059,11 @@ namespace NodeSetTool
                 aliases.Add(new Xml.NodeIdAlias() { Alias = alias.Key, Value = alias.Value });
             }
 
-            nodeset.Aliases = aliases.ToArray();
+            // Null rather than an empty array, so a document with no aliases omits the element
+            // instead of emitting an empty <Aliases /> — same reasoning as NamespaceUris above.
+            // A document loaded from an AddressSpace has no aliases to write: the table is the
+            // source document's shorthand, and it does not survive into the address space.
+            nodeset.Aliases = aliases.Count > 0 ? aliases.ToArray() : null;
 
             return nodeset;
         }
