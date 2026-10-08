@@ -11,10 +11,10 @@ public class UAMethod : UANode
     /// Object that contains this Method.
     /// </summary>
     [DataMember]
-    [JsonProperty(Order = 22)]
+    [JsonProperty(Order = 24)]
     public string? MethodDeclarationId { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 23)]
+    [JsonProperty(Order = 25)]
     public bool? Executable { get; set; }
 }

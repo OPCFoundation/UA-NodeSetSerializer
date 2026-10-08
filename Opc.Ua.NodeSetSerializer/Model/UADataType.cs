@@ -7,11 +7,11 @@ namespace Opc.Ua.NodeSetSerializer.Model;
 public class UADataType : UANode
 {
     [DataMember]
-    [JsonProperty(Order = 22)]
+    [JsonProperty(Order = 24)]
     public DataTypePurpose? Purpose { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 23)]
+    [JsonProperty(Order = 25)]
     public DataTypeDefinition? Definition { get; set; }
 
     /// <summary>

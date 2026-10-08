@@ -6,7 +6,7 @@ namespace Opc.Ua.NodeSetSerializer.Model;
 /// <summary>
 /// Base type for all OPC UA Nodes. NodeId, NodeClass and BrowseName are mandatory and are emitted
 /// first, so a decoder can register a Node before reading the fields that may refer back to it.
-/// Subtypes continue the Order sequence from 22.
+/// Subtypes continue the Order sequence from 24.
 /// </summary>
 [DataContract]
 public class UANode
@@ -46,63 +46,81 @@ public class UANode
     [JsonProperty(Order = 6)]
     public string? ParentId { get; set; }
 
+    /// <summary>
+    /// The hierarchical ReferenceType from the parent to this Node. Set whenever
+    /// <see cref="ParentId"/> is, and neither direction of the Reference it names appears in the
+    /// <see cref="References"/> of the parent or of the child — this field is the Reference.
+    /// </summary>
     [DataMember]
     [JsonProperty(Order = 7)]
-    public string? TypeId { get; set; }
+    public string? ReferenceTypeId { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 8)]
-    public string? ModellingRuleId { get; set; }
+    public string? TypeId { get; set; }
 
+    /// <summary>
+    /// The supertype of a ReferenceType, DataType, ObjectType or VariableType. Replaces the
+    /// HasSubtype Reference, which appears in the <see cref="References"/> of neither the subtype
+    /// nor the supertype.
+    /// </summary>
     [DataMember]
     [JsonProperty(Order = 9)]
-    public LocalizedText? DisplayName { get; set; }
+    public string? SuperTypeId { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 10)]
-    public ReleaseStatus? ReleaseStatus { get; set; }
+    public string? ModellingRuleId { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 11)]
-    public string? Documentation { get; set; }
+    public LocalizedText? DisplayName { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 12)]
-    public LocalizedText? Description { get; set; }
+    public ReleaseStatus? ReleaseStatus { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 13)]
-    public bool? IsAbstract { get; set; }
+    public string? Documentation { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 14)]
-    public long? WriteMask { get; set; }
+    public LocalizedText? Description { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 15)]
-    public List<RolePermission>? RolePermissions { get; set; }
+    public bool? IsAbstract { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 16)]
-    public long? AccessRestrictions { get; set; }
+    public long? WriteMask { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 17)]
-    public bool? HasNoPermissions { get; set; }
+    public List<RolePermission>? RolePermissions { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 18)]
-    public bool? DesignToolOnly { get; set; }
+    public long? AccessRestrictions { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 19)]
-    public ChildList? Children { get; set; }
+    public bool? HasNoPermissions { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 20)]
-    public List<Reference>? References { get; set; }
+    public bool? DesignToolOnly { get; set; }
 
     [DataMember]
     [JsonProperty(Order = 21)]
+    public ChildList? Children { get; set; }
+
+    [DataMember]
+    [JsonProperty(Order = 22)]
+    public List<Reference>? References { get; set; }
+
+    [DataMember]
+    [JsonProperty(Order = 23)]
     public List<string>? ConformanceUnits { get; set; }
 }

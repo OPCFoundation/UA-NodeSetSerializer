@@ -225,13 +225,27 @@ namespace NodeSetTool
             }
         }
 
+        /// <summary>
+        /// The same nsu= URI check <see cref="ValidateJsonNode"/> runs over a nested Reference,
+        /// applied to a stand-alone one — the shape the JSONL layout writes.
+        /// </summary>
+        internal static void ValidateJsonReference(Json.UAReference reference, string location)
+        {
+            if (reference == null) return;
+            ValidateNodeIdEmbeddedUris(reference.SourceId, $"{location}.SourceId");
+            ValidateNodeIdEmbeddedUris(reference.TypeId, $"{location}.TypeId");
+            ValidateNodeIdEmbeddedUris(reference.TargetId, $"{location}.TargetId");
+        }
+
         internal static void ValidateJsonNode(Json.UANode node, string location)
         {
             if (node == null) return;
             ValidateNodeIdEmbeddedUris(node.NodeId, $"{location}.NodeId");
             ValidateNodeIdEmbeddedUris(node.BrowseName, $"{location}.BrowseName");
             ValidateNodeIdEmbeddedUris(node.ParentId, $"{location}.ParentId");
+            ValidateNodeIdEmbeddedUris(node.ReferenceTypeId, $"{location}.ReferenceTypeId");
             ValidateNodeIdEmbeddedUris(node.TypeId, $"{location}.TypeId");
+            ValidateNodeIdEmbeddedUris(node.SuperTypeId, $"{location}.SuperTypeId");
             ValidateNodeIdEmbeddedUris(node.ModellingRuleId, $"{location}.ModellingRuleId");
 
             if (node is Json.UAVariable v)
@@ -280,6 +294,10 @@ namespace NodeSetTool
                     }
                 }
             }
+
+            // The nsu= URIs a Node carries are checked as the Node is read. A Reference the JSONL
+            // layout lifted onto a line of its own arrives after that, so it is checked separately —
+            // see ValidateJsonReference.
 
             if (node.Children != null)
             {

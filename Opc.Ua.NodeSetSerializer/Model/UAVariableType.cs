@@ -7,18 +7,18 @@ namespace Opc.Ua.NodeSetSerializer.Model;
 public class UAVariableType : UANode
 {
     [DataMember]
-    [JsonProperty(Order = 22)]
+    [JsonProperty(Order = 24)]
     public string? DataType { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 23)]
+    [JsonProperty(Order = 25)]
     public int? ValueRank { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 24)]
+    [JsonProperty(Order = 26)]
     public string? ArrayDimensions { get; set; }
 
     [DataMember]
-    [JsonProperty(Order = 25)]
+    [JsonProperty(Order = 27)]
     public Variant? Value { get; set; }
 }

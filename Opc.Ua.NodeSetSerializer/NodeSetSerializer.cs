@@ -1,4 +1,4 @@
-﻿using Xml = Opc.Ua.Export;
+using Xml = Opc.Ua.Export;
 using Json = Opc.Ua.NodeSetSerializer.Model;
 using Opc.Ua;
 using Opc.Ua.NodeSetSerializer;
@@ -311,6 +311,8 @@ namespace NodeSetTool
             if (original.AccessRestrictions != target.AccessRestrictions) { m_errors.Add(new CompareError(original, nameof(Json.UANode.AccessRestrictions), original.AccessRestrictions, target.AccessRestrictions)); return false; }
             if (original.HasNoPermissions != target.HasNoPermissions) { m_errors.Add(new CompareError(original, nameof(Json.UANode.HasNoPermissions), original.HasNoPermissions, target.HasNoPermissions)); return false; }
             if (original.ParentId != target.ParentId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ParentId), original.ParentId, target.ParentId)); return false; }
+            if (original.ReferenceTypeId != target.ReferenceTypeId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ReferenceTypeId), original.ReferenceTypeId, target.ReferenceTypeId)); return false; }
+            if (original.SuperTypeId != target.SuperTypeId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.SuperTypeId), original.SuperTypeId, target.SuperTypeId)); return false; }
             if (original.IsAbstract != target.IsAbstract) { m_errors.Add(new CompareError(original, nameof(Json.UANode.IsAbstract), original.IsAbstract, target.IsAbstract)); return false; }
             if (original.DesignToolOnly != target.DesignToolOnly) { m_errors.Add(new CompareError(original, nameof(Json.UANode.DesignToolOnly), original.DesignToolOnly, target.DesignToolOnly)); return false; }
             if (original.ModellingRuleId != target.ModellingRuleId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ModellingRuleId), original.ModellingRuleId, target.ModellingRuleId)); return false; }
@@ -410,25 +412,30 @@ namespace NodeSetTool
                 return false;
             }
 
-            for (int ii = 0; ii < original.Count; ii++)
+            // Matched as a set rather than position by position. A Node's References carry no order:
+            // the XML and JSON encodings both write them in whatever order they were read in, and the
+            // JSONL layout writes each on a line of its own, released when the ReferenceType and the
+            // target it names have been written — so a Node whose References point at Nodes written
+            // at different times gets them back in a different order. Same reasoning as the
+            // ChildList comparison above.
+            var pending = new List<Json.Reference>(target);
+
+            foreach (var reference in original)
             {
-                if (original[ii].ReferenceTypeId != target[ii].ReferenceTypeId)
+                var found = pending.FindIndex(r =>
+                    r.ReferenceTypeId == reference.ReferenceTypeId
+                    && (r.IsForward ?? true) == (reference.IsForward ?? true)
+                    && r.TargetId == reference.TargetId);
+
+                if (found < 0)
                 {
-                    m_errors.Add(new CompareError(context, "Reference.ReferenceTypeId", original[ii].ReferenceTypeId, target[ii].ReferenceTypeId));
+                    m_errors.Add(new CompareError(context, "Reference",
+                        $"{reference.ReferenceTypeId} {(reference.IsForward == false ? "<-" : "->")} {reference.TargetId}",
+                        "(absent)"));
                     return false;
                 }
 
-                if (original[ii].IsForward != target[ii].IsForward)
-                {
-                    m_errors.Add(new CompareError(context, "Reference.IsForward", original[ii].IsForward, target[ii].IsForward));
-                    return false;
-                }
-
-                if (original[ii].TargetId != target[ii].TargetId)
-                {
-                    m_errors.Add(new CompareError(context, "Reference.TargetId", original[ii].TargetId, target[ii].TargetId));
-                    return false;
-                }
+                pending.RemoveAt(found);
             }
 
             return true;
@@ -828,29 +835,106 @@ namespace NodeSetTool
             }
         }
 
-        private static bool HasInverseReference(Json.UANode child, string? referenceTypeId, string? parentId)
+        // The well-known ReferenceTypes a parent -> child Reference is never one of: the
+        // NonHierarchicalReferences, less HasEncoding, plus HasSubtype. Anything not named here is
+        // treated as a candidate, which is what lets a companion model's own hierarchical
+        // ReferenceType pair with ParentId — the serializer has no type hierarchy to ask, and
+        // guessing wrong in that direction costs nothing a NodeSet actually contains.
+        //
+        // HasSubtype is hierarchical but belongs to SuperTypeId, and the two shorthand types to
+        // TypeId and ModellingRuleId. HasEncoding is non-hierarchical but stays a candidate: Annex
+        // I.19 says a DataTypeEncoding Node should be a child of its DataType and name it on
+        // ParentId, which makes HasEncoding the Reference ParentId pairs with.
+        //
+        // HasGuard, HasAlarmSuppressionGroup, AlarmGroupMember and AlarmSuppressionGroupMember read
+        // like exceptions and are not: they are subtypes of HasComponent or Organizes, so they are
+        // hierarchical, and the core NodeSet does pair ParentId with each of them.
+        private static readonly HashSet<string> s_nonHierarchical = new(StringComparer.Ordinal)
         {
-            if (child.References == null)
+            ReferenceTypeIds.HasSubtype,
+            ReferenceTypeIds.HasTypeDefinition,
+            ReferenceTypeIds.HasModellingRule,
+            ReferenceTypeIds.HasDescription,
+            ReferenceTypeIds.GeneratesEvent,
+            ReferenceTypeIds.AlwaysGeneratesEvent,
+            ReferenceTypeIds.HasCondition,
+            ReferenceTypeIds.HasDictionaryEntry,
+            ReferenceTypeIds.HasInterface,
+            ReferenceTypeIds.FromState,
+            ReferenceTypeIds.ToState,
+            ReferenceTypeIds.HasCause,
+            ReferenceTypeIds.HasEffect,
+            ReferenceTypeIds.HasTrueSubState,
+            ReferenceTypeIds.HasFalseSubState,
+        };
+
+        /// <summary>
+        /// Takes the References that Annex I.9 turns into fields off the Nodes that carry them:
+        /// the parent -> child Reference onto ParentId/ReferenceTypeId, and HasSubtype onto
+        /// SuperTypeId. Run after a flat sequence has been indexed, since both passes need to know
+        /// which NodeIds this file defines.
+        /// </summary>
+        internal void CollapseImpliedReferences()
+        {
+            CollapseParentReferences();
+            CollapseSuperTypeReferences();
+            CollapseMirroredReferences();
+        }
+
+        // A Reference has two directions and they are one Reference. Annex F asks a tool not to write
+        // both and Annex I.2.3 requires the JSONL layout to write one, but NodeSets in the wild state
+        // both for some Reference types — FromState and ToState throughout the core NodeSet, for
+        // instance. Keep the forward copy, which is the direction a Reference is named for, and drop
+        // the inverse copy the other Node carries. A decoder recreates it: both directions exist in
+        // the AddressSpace whatever the file says, which is why dropping one loses nothing.
+        //
+        // Reference types that are stated in one direction only, which is nearly all of them, are
+        // untouched: there is no second copy to match, and an inverse-only Reference keeps its
+        // direction.
+        internal void CollapseMirroredReferences()
+        {
+            if (m_sequence == null)
             {
-                return false;
+                return;
             }
 
-            foreach (var reference in child.References)
+            var forward = new HashSet<(string, string, string)>();
+
+            foreach (var node in m_sequence)
             {
-                if (reference.IsForward == false && reference.ReferenceTypeId == referenceTypeId && reference.TargetId == parentId)
+                if (node.References == null || node.NodeId == null) continue;
+
+                foreach (var reference in node.References)
                 {
-                    return true;
+                    if (reference.IsForward == false) continue;
+                    if (reference.ReferenceTypeId == null || reference.TargetId == null) continue;
+
+                    forward.Add((node.NodeId, reference.ReferenceTypeId, reference.TargetId));
                 }
             }
 
-            return false;
+            foreach (var node in m_sequence)
+            {
+                if (node.References == null || node.NodeId == null) continue;
+
+                node.References.RemoveAll(r =>
+                    r.IsForward == false
+                    && r.ReferenceTypeId != null
+                    && r.TargetId != null
+                    && forward.Contains((r.TargetId, r.ReferenceTypeId, node.NodeId)));
+
+                if (node.References.Count == 0)
+                {
+                    node.References = null;
+                }
+            }
         }
 
-        // A child states its parent with ParentId and is nested under the parent's Children, so the
-        // parent -> child direction of a reference is implied and is not stored in the JSON form. XML
-        // NodeSets state both directions; move any forward reference from a parent to one of its own
-        // children onto the child as an inverse reference (which preserves the reference type) and drop
-        // the parent's copy. BuildXml re-emits the forward direction when writing XML.
+        // A child states its parent with ParentId and the ReferenceType that joins them with
+        // ReferenceTypeId, so neither direction of that Reference is stored in the JSON form (Annex
+        // I.9). XML NodeSets state it on the parent, on the child, or on both; take the type from
+        // whichever copy is present, record it on the child, and drop every copy. BuildXml re-emits
+        // both directions when writing XML back out.
         internal void CollapseParentReferences()
         {
             if (m_sequence == null || m_nodes == null)
@@ -862,36 +946,93 @@ namespace NodeSetTool
             {
                 if (child.ParentId == null || child.NodeId == null) continue;
                 if (!m_nodes.TryGetValue(child.ParentId, out var parent)) continue;
-                if (parent.References == null) continue;
 
-                for (int ii = parent.References.Count - 1; ii >= 0; ii--)
+                child.ReferenceTypeId ??=
+                    Hierarchical(child.References, isForward: false, parent.NodeId)
+                    ?? Hierarchical(parent.References, isForward: true, child.NodeId);
+
+                if (child.ReferenceTypeId == null) continue;
+
+                Remove(child, child.ReferenceTypeId, isForward: false, parent.NodeId);
+                Remove(parent, child.ReferenceTypeId, isForward: true, child.NodeId);
+            }
+
+            // The ReferenceType of the first Reference in the given direction between the two Nodes
+            // that could be the hierarchical one.
+            static string? Hierarchical(List<Json.Reference>? references, bool isForward, string? targetId)
+            {
+                if (references == null) return null;
+
+                foreach (var reference in references)
                 {
-                    var forward = parent.References[ii];
+                    if ((reference.IsForward ?? true) != isForward || reference.TargetId != targetId) continue;
+                    if (reference.ReferenceTypeId == null) continue;
+                    if (s_nonHierarchical.Contains(reference.ReferenceTypeId)) continue;
 
-                    if (forward.IsForward == false || forward.TargetId != child.NodeId)
+                    return reference.ReferenceTypeId;
+                }
+
+                return null;
+            }
+        }
+
+        // Annex I.9: SuperTypeId replaces the HasSubtype Reference, and it appears in the References
+        // of neither the subtype nor the supertype. The subtype's inverse copy is taken onto the
+        // field as the Node is converted; this drops the forward copy a supertype may carry, which
+        // needs the Node table to distinguish from a HasSubtype to a Node outside this file.
+        internal void CollapseSuperTypeReferences()
+        {
+            if (m_sequence == null || m_nodes == null)
+            {
+                return;
+            }
+
+            foreach (var node in m_sequence)
+            {
+                if (node.References == null || node.NodeId == null) continue;
+
+                for (int ii = node.References.Count - 1; ii >= 0; ii--)
+                {
+                    var reference = node.References[ii];
+
+                    if (reference.ReferenceTypeId != ReferenceTypeIds.HasSubtype) continue;
+                    if (reference.TargetId == null) continue;
+
+                    // The inverse direction names this Node's own supertype. ToJson takes it onto
+                    // SuperTypeId already, so one arriving here came from a hand-written document.
+                    if (reference.IsForward == false)
                     {
+                        node.SuperTypeId ??= reference.TargetId;
+                        node.References.RemoveAt(ii);
                         continue;
                     }
 
-                    if (!HasInverseReference(child, forward.ReferenceTypeId, parent.NodeId))
-                    {
-                        if (child.References == null) child.References = new();
+                    if (!m_nodes.TryGetValue(reference.TargetId, out var subtype)) continue;
 
-                        child.References.Add(new Json.Reference()
-                        {
-                            ReferenceTypeId = forward.ReferenceTypeId,
-                            IsForward = false,
-                            TargetId = parent.NodeId
-                        });
-                    }
-
-                    parent.References.RemoveAt(ii);
+                    subtype.SuperTypeId ??= node.NodeId;
+                    node.References.RemoveAt(ii);
                 }
 
-                if (parent.References.Count == 0)
+                if (node.References.Count == 0)
                 {
-                    parent.References = null;
+                    node.References = null;
                 }
+            }
+        }
+
+        /// <summary>Drops every copy of one Reference from a Node, and the empty list it leaves.</summary>
+        private static void Remove(Json.UANode node, string referenceTypeId, bool isForward, string? targetId)
+        {
+            if (node.References == null) return;
+
+            node.References.RemoveAll(r =>
+                r.ReferenceTypeId == referenceTypeId
+                && (r.IsForward ?? true) == isForward
+                && r.TargetId == targetId);
+
+            if (node.References.Count == 0)
+            {
+                node.References = null;
             }
         }
 
@@ -989,7 +1130,7 @@ namespace NodeSetTool
                 }
             }
 
-            CollapseParentReferences();
+            CollapseImpliedReferences();
         }
 
         /// <summary>
@@ -1187,9 +1328,17 @@ namespace NodeSetTool
             return declarations;
         }
 
-        // A node's supertype is the target of its inverse HasSubtype reference.
+        // Annex I.9 states the supertype on SuperTypeId. The inverse HasSubtype reference is still
+        // read, so a hand-written document that states it the older way resolves: CollapseImplied-
+        // References moves it onto the field, but this is also called on Nodes that never went
+        // through it.
         internal static string? FindSuperTypeId(Json.UANode node)
         {
+            if (node.SuperTypeId != null)
+            {
+                return node.SuperTypeId;
+            }
+
             if (node.References == null)
             {
                 return null;
@@ -1262,7 +1411,7 @@ namespace NodeSetTool
 
             RebuildChildLists();
 
-            CollapseParentReferences();
+            CollapseImpliedReferences();
         }
 
         /// <summary>
@@ -1444,6 +1593,17 @@ namespace NodeSetTool
                         continue;
                     }
 
+                    // Annex I.9: the supertype is a field, and the HasSubtype Reference it replaces
+                    // appears on neither side. This is the subtype's own inverse copy; the forward
+                    // copy a supertype may carry is dropped by CollapseSuperTypeReferences, which
+                    // needs the whole Node table to tell it apart from a Reference to a Node this
+                    // file does not define.
+                    if (referenceTypeId == ReferenceTypeIds.HasSubtype && !reference.IsForward)
+                    {
+                        output.SuperTypeId = ToJsonNodeId(reference.Value);
+                        continue;
+                    }
+
                     references.Add(new Json.Reference()
                     {
                         ReferenceTypeId = referenceTypeId,
@@ -1531,6 +1691,31 @@ namespace NodeSetTool
                 });
             }
 
+            // The JSON form states the supertype on SuperTypeId. XML NodeSets state it as the
+            // subtype's inverse HasSubtype reference, which is the only direction they carry.
+            if (!String.IsNullOrEmpty(input.SuperTypeId))
+            {
+                references.Add(new Xml.Reference()
+                {
+                    ReferenceType = ReferenceTypeIds.HasSubtype,
+                    IsForward = false,
+                    Value = ToXmlNodeId(input.SuperTypeId)
+                });
+            }
+
+            // The JSON form states the Reference that joins a child to its parent on ParentId and
+            // ReferenceTypeId, on the child alone. XML NodeSets state both directions: this is the
+            // child -> parent one, and the loop over Children below re-emits the other.
+            if (!String.IsNullOrEmpty(input.ParentId) && !String.IsNullOrEmpty(input.ReferenceTypeId))
+            {
+                references.Add(new Xml.Reference()
+                {
+                    ReferenceType = ToXmlNodeId(input.ReferenceTypeId),
+                    IsForward = false,
+                    Value = ToXmlNodeId(input.ParentId)
+                });
+            }
+
             if (input.References != null)
             {
                 foreach (var reference in input.References)
@@ -1544,35 +1729,27 @@ namespace NodeSetTool
                 }
             }
 
-            // The JSON form omits the parent -> child direction because ParentId implies it. XML
-            // NodeSets state both directions, so re-emit a forward reference for every child that
-            // points back at this node.
+            // The JSON form omits the parent -> child direction because ParentId and
+            // ReferenceTypeId imply it. XML NodeSets state both directions, so re-emit a forward
+            // reference for every child this node owns.
             foreach (var child in EnumerateChildren(input.Children))
             {
-                if (child.References == null) continue;
+                if (child.ReferenceTypeId == null) continue;
 
-                foreach (var reference in child.References)
+                var referenceType = ToXmlNodeId(child.ReferenceTypeId);
+                var targetId = ToXmlNodeId(child.NodeId);
+
+                if (references.Any(r => r.IsForward && r.ReferenceType == referenceType && r.Value == targetId))
                 {
-                    if (reference.IsForward != false || reference.TargetId != input.NodeId)
-                    {
-                        continue;
-                    }
-
-                    var referenceType = ToXmlNodeId(reference.ReferenceTypeId);
-                    var targetId = ToXmlNodeId(child.NodeId);
-
-                    if (references.Any(r => r.IsForward && r.ReferenceType == referenceType && r.Value == targetId))
-                    {
-                        continue;
-                    }
-
-                    references.Add(new Xml.Reference()
-                    {
-                        ReferenceType = referenceType,
-                        IsForward = true,
-                        Value = targetId
-                    });
+                    continue;
                 }
+
+                references.Add(new Xml.Reference()
+                {
+                    ReferenceType = referenceType,
+                    IsForward = true,
+                    Value = targetId
+                });
             }
 
             if (references.Count > 0)
@@ -2649,7 +2826,9 @@ namespace NodeSetTool
                 RegisterNsuUri(node.NodeId);
                 RegisterNsuUri(node.BrowseName);
                 RegisterNsuUri(node.ParentId);
+                RegisterNsuUri(node.ReferenceTypeId);
                 RegisterNsuUri(node.TypeId);
+                RegisterNsuUri(node.SuperTypeId);
                 RegisterNsuUri(node.ModellingRuleId);
 
                 if (node is Json.UAMethod m)

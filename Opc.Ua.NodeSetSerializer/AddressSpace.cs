@@ -16,8 +16,9 @@ namespace Opc.Ua.NodeSetSerializer
     /// </summary>
     public class InstanceDeclaration : UANode
     {
-        /// <summary>The reference type from the type node to this declaration.</summary>
-        public string? ReferenceTypeId { get; set; }
+        // The reference type from the type node to this declaration is UANode.ReferenceTypeId,
+        // which Annex I.9 gives exactly that meaning. It used to be declared here as well; the
+        // callers that set it after SourceNode still override whatever the Node carried.
 
         /// <summary>The type node that defined this instance declaration.</summary>
         public string? SourceTypeNodeId { get; set; }
@@ -37,7 +38,9 @@ namespace Opc.Ua.NodeSetSerializer
                 DisplayName = value.DisplayName;
                 Description = value.Description;
                 ParentId = value.ParentId;
+                ReferenceTypeId = value.ReferenceTypeId;
                 TypeId = value.TypeId;
+                SuperTypeId = value.SuperTypeId;
                 ModellingRuleId = value.ModellingRuleId;
                 IsAbstract = value.IsAbstract;
             }
@@ -426,7 +429,9 @@ namespace Opc.Ua.NodeSetSerializer
                 CollectDependentNamespace(node.NodeId, modelUri, nodeNs, dependentNamespaces);
                 CollectDependentNamespace(node.BrowseName, modelUri, nodeNs, dependentNamespaces);
                 CollectDependentNamespace(node.ParentId, modelUri, nodeNs, dependentNamespaces);
+                CollectDependentNamespace(node.ReferenceTypeId, modelUri, nodeNs, dependentNamespaces);
                 CollectDependentNamespace(node.TypeId, modelUri, nodeNs, dependentNamespaces);
+                CollectDependentNamespace(node.SuperTypeId, modelUri, nodeNs, dependentNamespaces);
                 CollectDependentNamespace(node.ModellingRuleId, modelUri, nodeNs, dependentNamespaces);
 
                 if (node is UAVariable v)
@@ -535,7 +540,9 @@ namespace Opc.Ua.NodeSetSerializer
             ValidateNsuField(node.NodeId, "NodeId", node, knownUris, errors);
             ValidateNsuField(node.BrowseName, "BrowseName", node, knownUris, errors);
             ValidateNsuField(node.ParentId, "ParentId", node, knownUris, errors);
+            ValidateNsuField(node.ReferenceTypeId, "ReferenceTypeId", node, knownUris, errors);
             ValidateNsuField(node.TypeId, "TypeId", node, knownUris, errors);
+            ValidateNsuField(node.SuperTypeId, "SuperTypeId", node, knownUris, errors);
             ValidateNsuField(node.ModellingRuleId, "ModellingRuleId", node, knownUris, errors);
 
             if (node is UAVariable v)
@@ -623,7 +630,9 @@ namespace Opc.Ua.NodeSetSerializer
                 CollectDependentNamespace(node.NodeId, modelUri, nodeNs, result);
                 CollectDependentNamespace(node.BrowseName, modelUri, nodeNs, result);
                 CollectDependentNamespace(node.ParentId, modelUri, nodeNs, result);
+                CollectDependentNamespace(node.ReferenceTypeId, modelUri, nodeNs, result);
                 CollectDependentNamespace(node.TypeId, modelUri, nodeNs, result);
+                CollectDependentNamespace(node.SuperTypeId, modelUri, nodeNs, result);
                 CollectDependentNamespace(node.ModellingRuleId, modelUri, nodeNs, result);
 
                 if (node is UAVariable v)
@@ -711,46 +720,60 @@ namespace Opc.Ua.NodeSetSerializer
                 {
                     if (r.TargetId == null || r.ReferenceTypeId == null) continue;
 
-                    bool isForward = r.IsForward ?? true;
-
-                    var entry = new ReferenceEntry
-                    {
-                        SourceNodeId = node.NodeId,
-                        ReferenceTypeId = r.ReferenceTypeId,
-                        TargetNodeId = r.TargetId,
-                        IsForward = isForward
-                    };
-
-                    if (isForward)
-                    {
-                        AddIfNotDuplicate(_forwardRefs, node.NodeId, entry);
-                        var inverse = new ReferenceEntry
-                        {
-                            SourceNodeId = r.TargetId,
-                            ReferenceTypeId = r.ReferenceTypeId,
-                            TargetNodeId = node.NodeId,
-                            IsForward = false
-                        };
-                        AddIfNotDuplicate(_inverseRefs, r.TargetId, inverse);
-                    }
-                    else
-                    {
-                        AddIfNotDuplicate(_inverseRefs, node.NodeId, entry);
-                        var forward = new ReferenceEntry
-                        {
-                            SourceNodeId = r.TargetId,
-                            ReferenceTypeId = r.ReferenceTypeId,
-                            TargetNodeId = node.NodeId,
-                            IsForward = true
-                        };
-                        AddIfNotDuplicate(_forwardRefs, r.TargetId, forward);
-                    }
+                    Link(node.NodeId, r.ReferenceTypeId, r.TargetId, r.IsForward ?? true);
                 }
+            }
+
+            // Annex I.9 states two References as fields rather than in the References list, so the
+            // reference index has to put them back: everything that browses the address space —
+            // the supertype cache included — reads them from here and not off the Node.
+            if (node.SuperTypeId != null)
+            {
+                Link(node.NodeId, HasSubtypeId, node.SuperTypeId, isForward: false);
+            }
+
+            if (node.ParentId != null && node.ReferenceTypeId != null)
+            {
+                Link(node.NodeId, node.ReferenceTypeId, node.ParentId, isForward: false);
             }
 
             if (node.Children != null)
             {
                 AddChildren(node.Children, node.NodeId);
+            }
+        }
+
+        /// <summary>
+        /// Records one Reference in both indexes. A NodeSet states a Reference once and a decoder
+        /// creates both directions, so the stated direction and its mirror are added together.
+        /// </summary>
+        private void Link(string sourceNodeId, string referenceTypeId, string targetNodeId, bool isForward)
+        {
+            var stated = new ReferenceEntry
+            {
+                SourceNodeId = sourceNodeId,
+                ReferenceTypeId = referenceTypeId,
+                TargetNodeId = targetNodeId,
+                IsForward = isForward
+            };
+
+            var mirror = new ReferenceEntry
+            {
+                SourceNodeId = targetNodeId,
+                ReferenceTypeId = referenceTypeId,
+                TargetNodeId = sourceNodeId,
+                IsForward = !isForward
+            };
+
+            if (isForward)
+            {
+                AddIfNotDuplicate(_forwardRefs, sourceNodeId, stated);
+                AddIfNotDuplicate(_inverseRefs, targetNodeId, mirror);
+            }
+            else
+            {
+                AddIfNotDuplicate(_inverseRefs, sourceNodeId, stated);
+                AddIfNotDuplicate(_forwardRefs, targetNodeId, mirror);
             }
         }
 
