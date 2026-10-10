@@ -234,11 +234,11 @@
           "type": "string"
         },
         "ParentId": {
-          "description": "The owner of the Node. Ownership is separate from any References between a parent and child: it indicates that a Node is deleted when its parent is deleted. Ignored when the Node is in a ChildList, where the owner is always the containing Node. The hierarchical Reference between the parent and the child is named by ReferenceTypeId and appears in the References list of neither of them.",
+          "description": "The owner of the Node. Ownership is separate from any References between a parent and child: it indicates that a Node is deleted when its parent is deleted. Omitted when the Node is in a ChildList, where the owner is always the containing Node and this field would only repeat its NodeId; a nested Node that carries one anyway is ignored. A top-level Node keeps it, which is how a Node owned by a parent in another model states its owner. The JSONL encoding flattens the nesting away, so there it is written on every owned Node. The hierarchical Reference between the parent and the child is named by ReferenceTypeId and appears in the References list of neither of them.",
           "type": "string"
         },
         "ReferenceTypeId": {
-          "description": "The hierarchical ReferenceType from the parent to this Node. Set whenever ParentId is. Neither direction of the Reference it names appears in the References list of the parent or of the child: this field is the Reference.",
+          "description": "The hierarchical ReferenceType from the parent to this Node. Set whenever the Node has an owner, including on a nested Node where ParentId is omitted: the container says who the owner is but not which ReferenceType joins them. Neither direction of the Reference it names appears in the References list of the parent or of the child: this field is the Reference.",
           "type": "string"
         },
         "TypeId": {
@@ -511,7 +511,7 @@
           "type": "string"
         },
         "IsForward": {
-          "description": "TRUE, or absent, if the Reference is a forward Reference.",
+          "description": "TRUE, or absent, if the Reference is a forward Reference. Only set when the forward source is a Node in another model, which leaves this end the only one available to state the Reference on; a Reference between two Nodes of this NodeSet is always stored forward.",
           "type": [ "boolean", "null" ]
         },
         "TargetId": {
@@ -520,27 +520,20 @@
       }
     },
     "UAReference": {
-      "description": "A Reference standing on its own rather than inside the Node it belongs to, which is how the JSONL layout carries one: a line of its own, written after the source Node and after the ReferenceType and target it names. Only one direction is written; a decoder creates both unless Unidirectional says otherwise.",
+      "description": "A Reference standing on its own rather than inside the Node it belongs to, which is how the JSONL layout carries one: a line of its own, written after both the Nodes it names. It is always the forward direction, so there is no IsForward field and no Unidirectional flag: an inverse Reference is written as the forward Reference between the same two Nodes the other way round, and a decoder always creates both directions. The structural References that UANode states as fields are not written this way and keep their own rules, so HasTypeDefinition stays one-way.",
       "type": "object",
       "properties": {
         "SourceId": {
-          "description": "The Node the Reference belongs to. Always a Node written on an earlier line. Its presence is what tells a Reference line apart from a Node line.",
+          "description": "The source Node of the forward Reference. Its presence is what tells a Reference line apart from a Node line. Usually a Node written on an earlier line; it names a Node in another model when this NodeSet holds only the target end.",
           "type": "string"
         },
         "TypeId": {
           "description": "The ReferenceType. Named TypeId here, ReferenceTypeId inside a Node.",
           "type": "string"
         },
-        "IsForward": {
-          "description": "TRUE if the Reference is a forward Reference.",
-          "type": [ "boolean", "null" ]
-        },
         "TargetId": {
+          "description": "The target Node of the forward Reference.",
           "type": "string"
-        },
-        "Unidirectional": {
-          "description": "TRUE when only the stated direction exists. A NodeSet describes an AddressSpace, where both directions of a Reference exist, so the writer leaves this absent.",
-          "type": [ "boolean", "null" ]
         }
       },
       "required": [ "SourceId", "TypeId", "TargetId" ]

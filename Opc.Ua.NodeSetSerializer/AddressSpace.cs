@@ -65,6 +65,12 @@ namespace Opc.Ua.NodeSetSerializer
         public IReadOnlyDictionary<string, ModelDefinition> Models => _models;
         public IReadOnlyList<UANode> Nodes => _sequence;
 
+        /// <summary>
+        /// The ReferenceTypes whose reverse direction is not created when a Reference is indexed.
+        /// Set before any Node is added; changing it afterwards does not revisit what is already in.
+        /// </summary>
+        public OneWayReferenceTypes OneWayReferenceTypes { get; set; } = OneWayReferenceTypes.Default;
+
         public void AddModel(ModelDefinition model)
         {
             ArgumentNullException.ThrowIfNull(model);
@@ -745,7 +751,9 @@ namespace Opc.Ua.NodeSetSerializer
 
         /// <summary>
         /// Records one Reference in both indexes. A NodeSet states a Reference once and a decoder
-        /// creates both directions, so the stated direction and its mirror are added together.
+        /// creates both directions, so the stated direction and its mirror are added together —
+        /// unless the ReferenceType is one of the <see cref="OneWayReferenceTypes"/>, which have no
+        /// reverse direction to create.
         /// </summary>
         private void Link(string sourceNodeId, string referenceTypeId, string targetNodeId, bool isForward)
         {
@@ -757,6 +765,23 @@ namespace Opc.Ua.NodeSetSerializer
                 IsForward = isForward
             };
 
+            if (isForward)
+            {
+                AddIfNotDuplicate(_forwardRefs, sourceNodeId, stated);
+            }
+            else
+            {
+                AddIfNotDuplicate(_inverseRefs, sourceNodeId, stated);
+            }
+
+            // SuperTypeOf rather than IsTypeOf: the cache this builds is the supertype chain, and
+            // asking it here while the Node that is being added is still going in would be asking it
+            // to rebuild mid-walk. The chain of a ReferenceType does not depend on that Node.
+            if (OneWayReferenceTypes.IsOneWay(referenceTypeId, SuperTypeOfReferenceType))
+            {
+                return;
+            }
+
             var mirror = new ReferenceEntry
             {
                 SourceNodeId = targetNodeId,
@@ -767,15 +792,20 @@ namespace Opc.Ua.NodeSetSerializer
 
             if (isForward)
             {
-                AddIfNotDuplicate(_forwardRefs, sourceNodeId, stated);
                 AddIfNotDuplicate(_inverseRefs, targetNodeId, mirror);
             }
             else
             {
-                AddIfNotDuplicate(_inverseRefs, sourceNodeId, stated);
                 AddIfNotDuplicate(_forwardRefs, targetNodeId, mirror);
             }
         }
+
+        /// <summary>
+        /// The supertype of a ReferenceType, read straight off the Node rather than through the
+        /// supertype cache, which cannot be built while a Node is being added.
+        /// </summary>
+        private string? SuperTypeOfReferenceType(string nodeId) =>
+            _nodes.TryGetValue(nodeId, out var node) ? node.SuperTypeId : null;
 
         private void AddChildren(ChildList children, string parentNodeId)
         {
@@ -816,37 +846,9 @@ namespace Opc.Ua.NodeSetSerializer
                 IsForward = isForward,
             });
 
-            // Index in forward/inverse dictionaries
-            var entry = new ReferenceEntry
-            {
-                SourceNodeId = sourceNodeId,
-                ReferenceTypeId = referenceTypeId,
-                TargetNodeId = targetNodeId,
-                IsForward = isForward,
-            };
-
-            if (isForward)
-            {
-                AddIfNotDuplicate(_forwardRefs, sourceNodeId, entry);
-                AddIfNotDuplicate(_inverseRefs, targetNodeId, new ReferenceEntry
-                {
-                    SourceNodeId = targetNodeId,
-                    ReferenceTypeId = referenceTypeId,
-                    TargetNodeId = sourceNodeId,
-                    IsForward = false,
-                });
-            }
-            else
-            {
-                AddIfNotDuplicate(_inverseRefs, sourceNodeId, entry);
-                AddIfNotDuplicate(_forwardRefs, targetNodeId, new ReferenceEntry
-                {
-                    SourceNodeId = targetNodeId,
-                    ReferenceTypeId = referenceTypeId,
-                    TargetNodeId = sourceNodeId,
-                    IsForward = true,
-                });
-            }
+            // Index in forward/inverse dictionaries. Link applies the one-way exceptions, so a
+            // GeneratesEvent added here is no more mirrored than one read from a file.
+            Link(sourceNodeId, referenceTypeId, targetNodeId, isForward);
 
             InvalidateSupertypeCache();
         }

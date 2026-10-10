@@ -121,11 +121,20 @@ namespace NodeSetTool
         #region NodeSet Comparisons
         public ReadOnlyCollection<CompareError> CompareErrors => new(m_errors);
 
+        /// <summary>
+        /// Differences that do not make the two NodeSets disagree about the AddressSpace they
+        /// describe, so they are reported without failing the comparison.
+        /// </summary>
+        public ReadOnlyCollection<CompareError> CompareWarnings => new(m_warnings);
+
+        private List<CompareError> m_warnings = new();
+
         public bool Compare(NodeSetSerializer target)
         {
             if (target == null) throw new ArgumentNullException(nameof(target));
 
             m_errors = new();
+            m_warnings = new();
 
             if (!CompareModels(target))
             {
@@ -160,7 +169,85 @@ namespace NodeSetTool
                 }
             }
 
-            return true;
+            return CompareReferences(target);
+        }
+
+        /// <summary>
+        /// Compares the References of the two NodeSets as one set of edges rather than Node by Node.
+        ///
+        /// <para>An edge is normalized to its forward direction, so it does not matter which end
+        /// states the Reference: a forward Reference on the source and an inverse Reference on the
+        /// target are the same edge and compare equal. Nor does it matter whether one side states
+        /// both directions and the other only one, since a consumer builds both either way — as a
+        /// set, the two copies are one edge.</para>
+        ///
+        /// <para>Normalizing to forward keeps the edge's own direction intact, so a one-way
+        /// ReferenceType is still compared the right way round and needs no special case.</para>
+        ///
+        /// <para>Done across the document because a Reference does not stay on the Node that
+        /// happened to state it: NormalizeReferenceDirection re-homes an inverse Reference onto the
+        /// Node it points at, which moves it between the two ends.</para>
+        /// </summary>
+        private bool CompareReferences(NodeSetSerializer target)
+        {
+            var original = ReferenceEdges(m_sequence!);
+            var other = ReferenceEdges(target.m_sequence!);
+
+            var missing = original.Except(other).ToList();
+            var extra = other.Except(original).ToList();
+
+            foreach (var (sourceId, typeId, targetId) in missing.Take(MaxReferenceErrors))
+            {
+                m_errors.Add(new CompareError(
+                    m_nodes!.GetValueOrDefault(sourceId), "Reference Not Found",
+                    $"{typeId} -> {targetId}", null));
+            }
+
+            foreach (var (sourceId, typeId, targetId) in extra.Take(MaxReferenceErrors))
+            {
+                m_errors.Add(new CompareError(
+                    target.m_nodes!.GetValueOrDefault(sourceId), "Extra Reference Found",
+                    null, $"{typeId} -> {targetId}"));
+            }
+
+            return missing.Count == 0 && extra.Count == 0;
+        }
+
+        // A mismatch is usually systematic, so the first few say what the hundredth would.
+        private const int MaxReferenceErrors = 10;
+
+        /// <summary>
+        /// Every Reference in the NodeSet as a forward (source, type, target) edge, including the
+        /// ones Annex I.9 states as fields. A set, so a Reference stated at both ends counts once.
+        /// </summary>
+        private static HashSet<(string SourceId, string TypeId, string TargetId)> ReferenceEdges(
+            IEnumerable<Json.UANode> nodes)
+        {
+            var edges = new HashSet<(string, string, string)>();
+
+            foreach (var node in nodes)
+            {
+                if (node.NodeId is not { } nodeId) continue;
+
+                foreach (var reference in Json.UANodeReferences.All(node))
+                {
+                    if (reference.ReferenceTypeId == null || reference.TargetId == null) continue;
+
+                    var forward = reference.IsForward != false;
+
+                    edges.Add((
+                        forward ? nodeId : reference.TargetId,
+                        reference.ReferenceTypeId,
+                        forward ? reference.TargetId : nodeId));
+                }
+
+                // The two shorthand fields are one-way References, so they are edges in their own
+                // right and have no inverse to normalize.
+                if (node.TypeId != null) edges.Add((nodeId, ReferenceTypeIds.HasTypeDefinition, node.TypeId));
+                if (node.ModellingRuleId != null) edges.Add((nodeId, ReferenceTypeIds.HasModellingRule, node.ModellingRuleId));
+            }
+
+            return edges;
         }
 
         private bool CompareModels(NodeSetSerializer target)
@@ -310,15 +397,39 @@ namespace NodeSetTool
             if (original.Documentation != target.Documentation) { m_errors.Add(new CompareError(original, nameof(Json.UANode.Documentation), original.Documentation, target.Documentation)); return false; }
             if (original.AccessRestrictions != target.AccessRestrictions) { m_errors.Add(new CompareError(original, nameof(Json.UANode.AccessRestrictions), original.AccessRestrictions, target.AccessRestrictions)); return false; }
             if (original.HasNoPermissions != target.HasNoPermissions) { m_errors.Add(new CompareError(original, nameof(Json.UANode.HasNoPermissions), original.HasNoPermissions, target.HasNoPermissions)); return false; }
-            if (original.ParentId != target.ParentId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ParentId), original.ParentId, target.ParentId)); return false; }
-            if (original.ReferenceTypeId != target.ReferenceTypeId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ReferenceTypeId), original.ReferenceTypeId, target.ReferenceTypeId)); return false; }
+            // A DataTypeEncoding whose ownership only one side states is a warning, not a failure.
+            // Annex I.19 says it should be a child of its DataType, and AdoptDataTypeEncodings
+            // derives that from the HasEncoding Reference — but only when the Reference is there to
+            // derive it from. A NodeSet that leaves the encoding loose still describes the same
+            // AddressSpace, since ParentId carries ownership and not a Reference.
+            if (original.ParentId != target.ParentId || original.ReferenceTypeId != target.ReferenceTypeId)
+            {
+                if (IsLooseEncoding(original, target) || IsLooseEncoding(target, original))
+                {
+                    m_warnings.Add(new CompareError(original, "DataTypeEncoding ownership",
+                        Describe(original), Describe(target)));
+                }
+                else if (original.ParentId != target.ParentId)
+                {
+                    m_errors.Add(new CompareError(original, nameof(Json.UANode.ParentId), original.ParentId, target.ParentId));
+                    return false;
+                }
+                else
+                {
+                    m_errors.Add(new CompareError(original, nameof(Json.UANode.ReferenceTypeId), original.ReferenceTypeId, target.ReferenceTypeId));
+                    return false;
+                }
+            }
             if (original.SuperTypeId != target.SuperTypeId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.SuperTypeId), original.SuperTypeId, target.SuperTypeId)); return false; }
             if (original.IsAbstract != target.IsAbstract) { m_errors.Add(new CompareError(original, nameof(Json.UANode.IsAbstract), original.IsAbstract, target.IsAbstract)); return false; }
             if (original.DesignToolOnly != target.DesignToolOnly) { m_errors.Add(new CompareError(original, nameof(Json.UANode.DesignToolOnly), original.DesignToolOnly, target.DesignToolOnly)); return false; }
             if (original.ModellingRuleId != target.ModellingRuleId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ModellingRuleId), original.ModellingRuleId, target.ModellingRuleId)); return false; }
             if (original.ReleaseStatus != target.ReleaseStatus) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ReleaseStatus), original.ReleaseStatus, target.ReleaseStatus)); return false; }
             if (!Compare(original.ConformanceUnits, target.ConformanceUnits)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ConformanceUnits), original.ConformanceUnits, target.ConformanceUnits)); return false; }
-            if (!Compare(original, original.References, target.References)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.References), original.References, target.References)); return false; }
+            // References are not compared here. A Reference does not stay on the Node that stated
+            // it — an inverse one is re-homed onto the Node it points at — so the two NodeSets can
+            // hold the same Reference on different Nodes. They are compared as one set of edges by
+            // CompareReferences, once, for the whole document.
             if (!Compare(original, original.Children, target.Children)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.Children), original.Children, target.Children)); return false; }
             if (!Compare(original.RolePermissions, target.RolePermissions)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.RolePermissions), original.RolePermissions, target.RolePermissions)); return false; }
 
@@ -348,98 +459,87 @@ namespace NodeSetTool
         // order the Nodes were read in. Since JSONL writes them in dependency order, that is no
         // longer the order they were authored in — so the children are paired by NodeId rather than
         // by position, and each pair compared in full.
+        /// <para>A child only one side owns is a failure, except for a DataTypeEncoding: Annex I.19
+        /// has it owned by its DataType, and whether a given NodeSet says so is the same warning
+        /// <see cref="IsLooseEncoding"/> covers on the encoding itself. The two reports are the two
+        /// ends of one difference, so this one is raised on the DataType's side only when the
+        /// encoding is genuinely absent from the other list rather than merely unowned there.</para>
         private bool Compare(Json.UANode? context, Json.ChildList? original, Json.ChildList? target)
         {
-            if (original == null || target == null) return Object.ReferenceEquals(original, target);
+            if (original == null && target == null) return true;
 
-            return CompareBucket("Objects", original.Objects, target.Objects)
-                && CompareBucket("Variables", original.Variables, target.Variables)
-                && CompareBucket("Methods", original.Methods, target.Methods);
+            // A ChildList that exists on one side only is the usual shape of this difference: the
+            // DataType gains one by adopting its encodings. Compared bucket by bucket against
+            // nothing, which lets the encodings warn and anything else fail.
+            return CompareBucket("Objects", original?.Objects, target?.Objects)
+                && CompareBucket("Variables", original?.Variables, target?.Variables)
+                && CompareBucket("Methods", original?.Methods, target?.Methods);
 
             bool CompareBucket<T>(string name, List<T>? left, List<T>? right) where T : Json.UANode
             {
-                if (left == null || right == null) return left == null && right == null;
+                var byId = new Dictionary<string, T>(StringComparer.Ordinal);
 
-                if (left.Count != right.Count)
-                {
-                    m_errors.Add(new CompareError(context, $"ChildList.{name}.Count", left.Count, right.Count));
-                    return false;
-                }
-
-                var byId = new Dictionary<string, T>(right.Count, StringComparer.Ordinal);
-
-                foreach (var child in right)
+                foreach (var child in right ?? new List<T>())
                 {
                     if (child?.NodeId != null) byId[child.NodeId] = child;
                 }
 
-                foreach (var child in left)
+                foreach (var child in left ?? new List<T>())
                 {
-                    if (child?.NodeId == null || !byId.TryGetValue(child.NodeId, out var counterpart))
+                    if (child?.NodeId == null)
                     {
-                        m_errors.Add(new CompareError(context, $"ChildList.{name}.NodeId", child?.NodeId, null));
+                        m_errors.Add(new CompareError(context, $"ChildList.{name}.NodeId", null, null));
                         return false;
                     }
 
-                    if (!Compare(child, counterpart)) return false;
+                    if (byId.Remove(child.NodeId, out var counterpart))
+                    {
+                        if (!Compare(child, counterpart)) return false;
+                        continue;
+                    }
+
+                    if (!Unowned(child, name, child.NodeId)) return false;
+                }
+
+                // Whatever is left is on the other side only.
+                foreach (var child in byId.Values)
+                {
+                    if (!Unowned(child, name, child.NodeId!)) return false;
                 }
 
                 return true;
             }
-        }
 
-        private bool Compare(Json.UANode? context, IList<Json.Reference>? original, IList<Json.Reference>? target)
-        {
-            if (original == null || target == null)
+            bool Unowned(Json.UANode child, string name, string nodeId)
             {
-                // An absent list and an empty list both mean "no references".
-                if (original == null && target == null)
+                if (child.TypeId == DataTypeEncodingType)
                 {
+                    m_warnings.Add(new CompareError(context, "DataTypeEncoding ownership",
+                        $"{nodeId} is owned here", "it is not owned there"));
                     return true;
                 }
 
-                if (original != null && original.Count == 0)
-                {
-                    return true;
-                }
-
-                return (target != null && target.Count == 0);
-            }
-
-            if (original.Count != target.Count)
-            {
-                m_errors.Add(new CompareError(context, "ReferenceList", original.Count, target.Count));
+                m_errors.Add(new CompareError(context, $"ChildList.{name}.NodeId", nodeId, null));
                 return false;
             }
-
-            // Matched as a set rather than position by position. A Node's References carry no order:
-            // the XML and JSON encodings both write them in whatever order they were read in, and the
-            // JSONL layout writes each on a line of its own, released when the ReferenceType and the
-            // target it names have been written — so a Node whose References point at Nodes written
-            // at different times gets them back in a different order. Same reasoning as the
-            // ChildList comparison above.
-            var pending = new List<Json.Reference>(target);
-
-            foreach (var reference in original)
-            {
-                var found = pending.FindIndex(r =>
-                    r.ReferenceTypeId == reference.ReferenceTypeId
-                    && (r.IsForward ?? true) == (reference.IsForward ?? true)
-                    && r.TargetId == reference.TargetId);
-
-                if (found < 0)
-                {
-                    m_errors.Add(new CompareError(context, "Reference",
-                        $"{reference.ReferenceTypeId} {(reference.IsForward == false ? "<-" : "->")} {reference.TargetId}",
-                        "(absent)"));
-                    return false;
-                }
-
-                pending.RemoveAt(found);
-            }
-
-            return true;
         }
+
+
+        /// <summary>
+        /// Whether <paramref name="loose"/> is a DataTypeEncoding left unowned while
+        /// <paramref name="owned"/> says who owns it. Both have to be the encoding — a Node that is
+        /// not one has no business losing its ParentId.
+        /// </summary>
+        private static bool IsLooseEncoding(Json.UANode loose, Json.UANode owned) =>
+            loose.TypeId == DataTypeEncodingType
+            && owned.TypeId == DataTypeEncodingType
+            && loose.ParentId == null
+            && owned.ParentId != null;
+
+        private static string Describe(Json.UANode node) =>
+            node.ParentId == null
+                ? "no ParentId"
+                : $"ParentId {node.ParentId} via {node.ReferenceTypeId ?? "(no ReferenceTypeId)"}";
 
         private bool Compare(IList<string>? original, IList<string>? target)
         {
@@ -718,6 +818,7 @@ namespace NodeSetTool
 
             var nodeset = BuildJson();
 
+            using var nested = SuppressNestedParentIds();
             using (StreamWriter file = File.CreateText(filePath))
             using (JsonTextWriter writer = new JsonTextWriter(file))
             {
@@ -738,9 +839,57 @@ namespace NodeSetTool
 
             var nodeset = BuildJson();
 
+            using var nested = SuppressNestedParentIds();
             using var writer = new StreamWriter(stream, leaveOpen: true);
             using var jsonWriter = new JsonTextWriter(writer);
             serializer.Serialize(jsonWriter, nodeset);
+        }
+
+        /// <summary>
+        /// Takes ParentId off every Node that sits in a ChildList, for the duration of a write.
+        ///
+        /// <para>Annex I.9 says ParentId is ignored on a Node in a ChildList — the container is the
+        /// owner, and the field would only repeat its NodeId — so the canonical JSON encoding leaves
+        /// it out there. The nesting carries the same fact, and the reader puts ParentId back from
+        /// the container, so nothing is lost.</para>
+        ///
+        /// <para>Suppressed and restored rather than cleared outright because BuildJson hands out
+        /// the live Nodes rather than copies: the document does not want the value, but the model
+        /// does, and a SaveXml after a SaveJson would otherwise find the ownership gone.</para>
+        ///
+        /// <para>Only the JSON encoding. The JSONL layout flattens the nesting away, which leaves
+        /// ParentId as the only thing saying who owns what, and it is written on every owned
+        /// Node.</para>
+        /// </summary>
+        private IDisposable SuppressNestedParentIds() => new NestedParentIdScope(m_sequence);
+
+        private sealed class NestedParentIdScope : IDisposable
+        {
+            private readonly List<(Json.UANode Node, string ParentId)> m_suppressed = new();
+
+            public NestedParentIdScope(List<Json.UANode>? sequence)
+            {
+                foreach (var node in sequence ?? new List<Json.UANode>())
+                {
+                    foreach (var child in EnumerateChildren(node.Children))
+                    {
+                        if (child.ParentId is not { } parentId) continue;
+
+                        m_suppressed.Add((child, parentId));
+                        child.ParentId = null;
+                    }
+                }
+            }
+
+            public void Dispose()
+            {
+                foreach (var (node, parentId) in m_suppressed)
+                {
+                    node.ParentId = parentId;
+                }
+
+                m_suppressed.Clear();
+            }
         }
 
         public void LoadJson(string filePath)
@@ -876,24 +1025,104 @@ namespace NodeSetTool
         /// </summary>
         internal void CollapseImpliedReferences()
         {
+            AdoptDataTypeEncodings();
             CollapseParentReferences();
             CollapseSuperTypeReferences();
-            CollapseMirroredReferences();
+            NormalizeReferenceDirection();
         }
 
-        // A Reference has two directions and they are one Reference. Annex F asks a tool not to write
-        // both and Annex I.2.3 requires the JSONL layout to write one, but NodeSets in the wild state
-        // both for some Reference types — FromState and ToState throughout the core NodeSet, for
-        // instance. Keep the forward copy, which is the direction a Reference is named for, and drop
-        // the inverse copy the other Node carries. A decoder recreates it: both directions exist in
-        // the AddressSpace whatever the file says, which is why dropping one loses nothing.
+        /// <summary>The DataTypeEncodingType, which is what makes a Node an encoding.</summary>
+        internal const string DataTypeEncodingType = "i=76";
+
+        // Annex I.19: a DataTypeEncoding Node should be a child of its DataType and should name it
+        // on ParentId. XML NodeSets leave ParentNodeId unset on them, which leaves every "Default
+        // Binary" and "Default XML" a loose Object at the top of the document, owned by nothing and
+        // deleted with nothing.
         //
-        // Reference types that are stated in one direction only, which is nearly all of them, are
-        // untouched: there is no second copy to match, and an inverse-only Reference keeps its
-        // direction.
-        internal void CollapseMirroredReferences()
+        // The HasEncoding Reference already says which DataType owns which encoding, so ParentId is
+        // derived from it rather than being something a file has to state. Running before
+        // CollapseParentReferences means that pass then takes the Reference onto ReferenceTypeId in
+        // the ordinary way, and the encoding ends up in the DataType's ChildList like any other
+        // owned Node — including on the way back out to XML, which gains the ParentNodeId the
+        // original did not have.
+        //
+        // A value already present is never overwritten: a file that states the ownership differently
+        // is describing something this does not need to second-guess.
+        internal void AdoptDataTypeEncodings()
         {
-            if (m_sequence == null)
+            if (m_sequence == null || m_nodes == null)
+            {
+                return;
+            }
+
+            foreach (var node in m_sequence)
+            {
+                if (node.References == null || node.NodeId == null) continue;
+
+                foreach (var reference in node.References)
+                {
+                    if (reference.ReferenceTypeId != ReferenceTypeIds.HasEncoding) continue;
+                    if (reference.TargetId == null) continue;
+
+                    var forward = reference.IsForward != false;
+
+                    // HasEncoding runs DataType -> DataTypeEncoding, so the owner is the source and
+                    // the encoding the target, whichever end states it.
+                    var ownerId = forward ? node.NodeId : reference.TargetId;
+                    var encodingId = forward ? reference.TargetId : node.NodeId;
+
+                    if (!m_nodes.TryGetValue(encodingId, out var encoding)) continue;
+                    if (encoding.ParentId != null) continue;
+
+                    // The owner has to be here to own anything, and has to be a DataType: a
+                    // HasEncoding from anything else is not the relationship I.19 describes.
+                    if (!m_nodes.TryGetValue(ownerId, out var owner)) continue;
+                    if (owner is not Json.UADataType) continue;
+
+                    encoding.ParentId = ownerId;
+
+                    // Attached here rather than left to RebuildChildLists, which the JSON load path
+                    // does not run — a Node with a ParentId that no ChildList holds is dropped by
+                    // BuildJson, which skips any Node whose parent is in the document. Safe to do
+                    // unconditionally: ParentId was null a line ago, so nothing has it nested yet.
+                    Attach(owner, encoding);
+                }
+            }
+        }
+
+        /// <summary>Puts a Node into the right bucket of its owner's ChildList.</summary>
+        private static void Attach(Json.UANode parent, Json.UANode child)
+        {
+            parent.Children ??= new Json.ChildList();
+
+            switch (child)
+            {
+                case Json.UAObject od: { (parent.Children.Objects ??= new()).Add(od); break; }
+                case Json.UAVariable vn: { (parent.Children.Variables ??= new()).Add(vn); break; }
+                case Json.UAMethod mn: { (parent.Children.Methods ??= new()).Add(mn); break; }
+            }
+        }
+
+        // A Reference has two directions and they are one Reference, so only one is written and a
+        // decoder creates both. The one written is the forward direction: it is the direction the
+        // ReferenceType is named for, and fixing it means a Reference needs no IsForward at all.
+        //
+        // So an inverse Reference on a Node is re-homed as the forward Reference on the Node it
+        // points at. That also collapses a Reference a NodeSet states twice — FromState and ToState
+        // throughout the core NodeSet — because the inverse copy normalizes onto a forward copy that
+        // is already there.
+        //
+        // An inverse Reference whose target this NodeSet does not define keeps its direction, since
+        // there is no Node here to re-home it onto: the forward source is in another model, and the
+        // end this file holds is the target. Of the 107 inverse References across the first 40
+        // NodeSets in the corpus, 42 are of that kind, so it is the normal case and not a corner.
+        //
+        // The structural References that UANode states as fields are already off the list by now —
+        // CollapseParentReferences and CollapseSuperTypeReferences run first — and keep their own
+        // rules rather than being normalized here.
+        internal void NormalizeReferenceDirection()
+        {
+            if (m_sequence == null || m_nodes == null)
             {
                 return;
             }
@@ -913,20 +1142,49 @@ namespace NodeSetTool
                 }
             }
 
+            // Collected rather than added as they are found: adding to a Node's list while the walk
+            // is still reading it would have the pass normalize what it just wrote.
+            var rehomed = new List<(string SourceId, string TypeId, string TargetId)>();
+
             foreach (var node in m_sequence)
             {
                 if (node.References == null || node.NodeId == null) continue;
 
-                node.References.RemoveAll(r =>
-                    r.IsForward == false
-                    && r.ReferenceTypeId != null
-                    && r.TargetId != null
-                    && forward.Contains((r.TargetId, r.ReferenceTypeId, node.NodeId)));
+                for (int ii = node.References.Count - 1; ii >= 0; ii--)
+                {
+                    var reference = node.References[ii];
+
+                    if (reference.IsForward != false) continue;
+                    if (reference.ReferenceTypeId == null || reference.TargetId == null) continue;
+
+                    // The forward source is outside this NodeSet, so this end is the only one there
+                    // is to state it on.
+                    if (!m_nodes.ContainsKey(reference.TargetId)) continue;
+
+                    var triple = (reference.TargetId, reference.ReferenceTypeId, node.NodeId);
+
+                    // Already stated forward by the other Node: this is the second copy of one
+                    // Reference, and it goes away rather than being written again.
+                    if (forward.Add(triple)) rehomed.Add(triple);
+
+                    node.References.RemoveAt(ii);
+                }
 
                 if (node.References.Count == 0)
                 {
                     node.References = null;
                 }
+            }
+
+            foreach (var (sourceId, typeId, targetId) in rehomed)
+            {
+                var source = m_nodes[sourceId];
+
+                (source.References ??= new()).Add(new Json.Reference()
+                {
+                    ReferenceTypeId = typeId,
+                    TargetId = targetId,
+                });
             }
         }
 
