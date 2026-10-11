@@ -11,8 +11,9 @@ namespace Opc.Ua.NodeSetSerializer;
 ///   <item>Maintain indexes that allow schema-aware Variant emission:
 ///     <c>_encodingToDataType</c>, <c>_dataTypeToXmlEncoding</c>, <c>_modelXmlNamespace</c>.</item>
 ///   <item>Strip redundant "Default JSON" encoding nodes on request.</item>
-///   <item><see cref="ResolveVariants"/>: rewrite every <see cref="UAVariable"/>'s Part 6 JSON
-///     Variant DOM so that structure <see cref="JObject"/> keys are in <see cref="DataTypeDefinition"/>
+///   <item><see cref="ResolveVariants"/>: rewrite the Part 6 JSON Variant DOM of every
+///     <see cref="UAVariable"/> and <see cref="UAVariableType"/>
+///     so that structure <see cref="JObject"/> keys are in <see cref="DataTypeDefinition"/>
 ///     order, retype heuristically-typed primitives based on field DataType, normalize XML
 ///     encoding <c>TypeId</c>s to DataType NodeIds, and validate unions. Idempotent.</item>
 /// </list>
@@ -169,7 +170,8 @@ public partial class AddressSpace
     }
 
     /// <summary>
-    /// Canonicalize every <see cref="UAVariable"/>'s Part 6 JSON Variant DOM:
+    /// Canonicalize the Part 6 JSON Variant DOM of every Node that carries a Value —
+    /// <see cref="UAVariable"/> and <see cref="UAVariableType"/>, the only two that can:
     /// reorder struct keys to match <see cref="DataTypeDefinition"/> field order,
     /// retype heuristically-typed primitives based on the field's DataType, normalize any
     /// XML-encoding <c>TypeId</c>s to their underlying DataType NodeIds. Idempotent.
@@ -180,11 +182,27 @@ public partial class AddressSpace
 
         foreach (var node in _sequence)
         {
-            if (node is not UAVariable v) continue;
-            if (v.Value?.Value == null) continue;
+            // A VariableType's Value is its default value and is encoded exactly like a
+            // Variable's, so it needs the same canonicalization. Leaving it out left XML
+            // "Default XML"/"Default Binary" encoding NodeIds sitting in UaTypeId, which
+            // belongs to the XML encoding only — the JSON one names the DataType.
+            var value = node switch
+            {
+                UAVariable v => v.Value,
+                UAVariableType vt => vt.Value,
+                _ => null,
+            };
+            if (value?.Value == null) continue;
 
-            var dtId = NormalizeEncodingNodeIdToDataType(v.DataType);
-            v.Value.Value = CanonicalizeVariantValue(v.Value.Value, dtId);
+            var declaredDataType = node switch
+            {
+                UAVariable v => v.DataType,
+                UAVariableType vt => vt.DataType,
+                _ => null,
+            };
+
+            var dtId = NormalizeEncodingNodeIdToDataType(declaredDataType);
+            value.Value = CanonicalizeVariantValue(value.Value, dtId);
         }
     }
 

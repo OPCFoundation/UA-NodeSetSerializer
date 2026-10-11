@@ -28,6 +28,19 @@ public static class CoreNodeSetLoader
     }
 
     /// <summary>
+    /// Opens the embedded Core NodeSet. For a caller that wants the document itself rather
+    /// than an AddressSpace holding it — the comparison of two NodeSets reads the standard
+    /// DataTypes' HasEncoding References out of it, which no model file restates.
+    /// </summary>
+    internal static Stream OpenEmbeddedNodeSet()
+    {
+        var asm = typeof(CoreNodeSetLoader).Assembly;
+        return asm.GetManifestResourceStream(EmbeddedResourceName)
+            ?? throw new InvalidOperationException(
+                $"Embedded Core NodeSet resource '{EmbeddedResourceName}' not found in {asm.FullName}.");
+    }
+
+    /// <summary>
     /// Loads the embedded Core NodeSet into the given AddressSpace, but only if Core
     /// is not already present. Returns true if the embedded NodeSet was loaded.
     /// </summary>
@@ -36,10 +49,7 @@ public static class CoreNodeSetLoader
         ArgumentNullException.ThrowIfNull(space);
         if (HasCore(space)) return false;
 
-        var asm = typeof(CoreNodeSetLoader).Assembly;
-        using var stream = asm.GetManifestResourceStream(EmbeddedResourceName)
-            ?? throw new InvalidOperationException(
-                $"Embedded Core NodeSet resource '{EmbeddedResourceName}' not found in {asm.FullName}.");
+        using var stream = OpenEmbeddedNodeSet();
 
         var serializer = new NodeSetTool.NodeSetSerializer();
         serializer.LoadXml(stream);

@@ -136,6 +136,11 @@ namespace NodeSetTool
             m_errors = new();
             m_warnings = new();
 
+            // An ExtensionObject TypeId names the DataType in one encoding and its DataTypeEncoding
+            // in the other, so the Values are compared through the HasEncoding References of both
+            // documents. See NodeSetSerializer.CompareValues.cs.
+            m_encodingOwners = EncodingOwners(m_sequence!, target.m_sequence!);
+
             if (!CompareModels(target))
             {
                 return false;
@@ -432,6 +437,8 @@ namespace NodeSetTool
             // CompareReferences, once, for the whole document.
             if (!Compare(original, original.Children, target.Children)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.Children), original.Children, target.Children)); return false; }
             if (!Compare(original.RolePermissions, target.RolePermissions)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.RolePermissions), original.RolePermissions, target.RolePermissions)); return false; }
+            // The Variant a Variable or VariableType carries. Reports its own error.
+            if (!CompareValues(original, target)) return false;
 
             return true;
         }
@@ -3004,6 +3011,14 @@ namespace NodeSetTool
 
         public void LoadInto(AddressSpace addressSpace)
         {
+            // The serializer writes Variants through a VariantXmlContext built over
+            // m_addressSpace, and everything schema-aware in the XML encoding comes from
+            // there: the struct body's wrapper element name and XML namespace (the DataType's
+            // BrowseName, not "Body" in the Core namespace), the field ValueRanks, and the
+            // "Default XML" encoding NodeId that an XML ExtensionObject TypeId names. A
+            // document loaded into an AddressSpace and then written back out was resolving
+            // against nothing, so all of that was lost on the way out.
+            m_addressSpace = addressSpace;
             addressSpace.AddNodeSet(BuildJson());
             // Post-load: pre-compute DataTypeForm (Structure/Union/Enumeration/OptionSet)
             // for every UADataType so the Variant canonicalizer can recognise unions via
