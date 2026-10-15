@@ -141,41 +141,83 @@ namespace NodeSetTool
             // documents. See NodeSetSerializer.CompareValues.cs.
             m_encodingOwners = EncodingOwners(m_sequence!, target.m_sequence!);
 
-            if (!CompareModels(target))
+            // Every stage runs and every difference is collected: a caller comparing two revisions
+            // of a model wants the whole list, and stopping at the first one hides the Reference
+            // differences behind every Node difference. One error per Node, not per Attribute --
+            // Compare(Node, Node) still reports the first Attribute that differs and moves on, which
+            // is enough to say which Node to look at.
+            var same = CompareModels(target);
+
+            foreach (var node in m_sequence!)
+            {
+                if (TooManyErrors())
+                {
+                    same = false;
+                    break;
+                }
+
+                if (!target.m_nodes!.TryGetValue(node.NodeId!, out var match))
+                {
+                    m_errors.Add(new CompareError(node, "Node Not Found", node.NodeId, null));
+                    same = false;
+                    continue;
+                }
+
+                if (!Compare(node, match))
+                {
+                    same = false;
+                }
+            }
+
+            // Only the Nodes the input does not have: the loop above has already compared every
+            // Node the two share, and comparing them again here would report each difference twice
+            // with the two sides swapped.
+            foreach (var node in target.m_sequence!)
+            {
+                if (TooManyErrors())
+                {
+                    same = false;
+                    break;
+                }
+
+                if (!m_nodes!.ContainsKey(node.NodeId!))
+                {
+                    m_errors.Add(new CompareError(node, "Extra Node Found", null, node.NodeId));
+                    same = false;
+                }
+            }
+
+            // Not short-circuited: the Reference comparison reports differences of its own and is
+            // worth seeing whether or not the Nodes matched.
+            return CompareReferences(target) && same;
+        }
+
+        /// <summary>
+        /// Whether the Node walk has reported as much as it usefully can, marking the list as cut
+        /// short the first time it has.
+        ///
+        /// <para>Two unrelated NodeSets differ at every Node, and a list that long says no more than
+        /// its first page does. Checked per Node rather than per error because the Attribute
+        /// comparisons add to the list directly; stopping the walk is what bounds it.</para>
+        /// </summary>
+        private bool TooManyErrors()
+        {
+            if (m_errors.Count < MaxNodeErrors)
             {
                 return false;
             }
 
-            foreach (var node in m_sequence!)
+            if (m_errors.Count == MaxNodeErrors)
             {
-                if (!target.m_nodes!.TryGetValue(node.NodeId!, out var match))
-                {
-                    m_errors.Add(new CompareError(node, "Node Not Found", node.NodeId, null));
-                    return false;
-                }
-
-                if (!Compare(node, match))
-                {
-                    return false;
-                }
+                m_errors.Add(new CompareError(null,
+                    $"Too many Node differences to report; stopped after {MaxNodeErrors}", null, null));
             }
 
-            foreach (var node in target.m_sequence!)
-            {
-                if (!m_nodes!.TryGetValue(node.NodeId!, out var match))
-                {
-                    m_errors.Add(new CompareError(node, "Extra Node Found", node.NodeId, null));
-                    return false;
-                }
-
-                if (!Compare(node, match))
-                {
-                    return false;
-                }
-            }
-
-            return CompareReferences(target);
+            return true;
         }
+
+        // Enough to cover a NodeSet whose every Node moved, without burying the first page.
+        private const int MaxNodeErrors = 500;
 
         /// <summary>
         /// Compares the References of the two NodeSets as one set of edges rather than Node by Node.
@@ -257,34 +299,48 @@ namespace NodeSetTool
 
         private bool CompareModels(NodeSetSerializer target)
         {
+            var same = true;
+
             if (m_models!.Count != target.m_models!.Count)
             {
                 m_errors.Add(new CompareError(null, "Model Count", m_models.Count, target.m_models.Count));
-                return false;
+                same = false;
             }
 
+            // Every Model is reported, and a differing count no longer stops the walk: which Model
+            // is missing is the useful half of that answer.
             foreach (var kvp in m_models)
             {
                 if (!target.m_models.TryGetValue(kvp.Key, out var targetModel))
                 {
                     m_errors.Add(new CompareError(null, "Model Not Found", kvp.Key, null));
-                    return false;
+                    same = false;
+                    continue;
                 }
 
                 var srcModel = kvp.Value;
 
                 if (!CompareModelRef(srcModel, targetModel, srcModel.ModelUri!))
                 {
-                    return false;
+                    same = false;
                 }
 
                 if (!CompareRequiredModels(srcModel.RequiredModels, targetModel.RequiredModels, srcModel.ModelUri!))
                 {
-                    return false;
+                    same = false;
                 }
             }
 
-            return true;
+            foreach (var kvp in target.m_models)
+            {
+                if (!m_models.ContainsKey(kvp.Key))
+                {
+                    m_errors.Add(new CompareError(null, "Extra Model Found", null, kvp.Key));
+                    same = false;
+                }
+            }
+
+            return same;
         }
 
         private bool CompareModelRef(Json.ModelReference original, Json.ModelReference target, string context)
@@ -392,16 +448,21 @@ namespace NodeSetTool
         {
             if (original == null || target == null) return false;
 
-            if (original.NodeId != target.NodeId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.NodeId), original.NodeId, target.NodeId)); return false; }
-            if (original.NodeClass != target.NodeClass) { m_errors.Add(new CompareError(original, nameof(Json.UANode.NodeClass), original.NodeClass, target.NodeClass)); return false; }
-            if (original.SymbolicName != target.SymbolicName) { m_errors.Add(new CompareError(original, nameof(Json.UANode.SymbolicName), original.SymbolicName, target.SymbolicName)); return false; }
-            if (original.BrowseName != target.BrowseName) { m_errors.Add(new CompareError(original, nameof(Json.UANode.BrowseName), original.BrowseName, target.BrowseName)); return false; }
-            if (!Compare(original.DisplayName, target.DisplayName)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.DisplayName), original.DisplayName, target.DisplayName)); return false; }
-            if (!Compare(original.Description, target.Description)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.Description), original.Description, target.Description)); return false; }
-            if (original.WriteMask != target.WriteMask) { m_errors.Add(new CompareError(original, nameof(Json.UANode.WriteMask), original.WriteMask, target.WriteMask)); return false; }
-            if (original.Documentation != target.Documentation) { m_errors.Add(new CompareError(original, nameof(Json.UANode.Documentation), original.Documentation, target.Documentation)); return false; }
-            if (original.AccessRestrictions != target.AccessRestrictions) { m_errors.Add(new CompareError(original, nameof(Json.UANode.AccessRestrictions), original.AccessRestrictions, target.AccessRestrictions)); return false; }
-            if (original.HasNoPermissions != target.HasNoPermissions) { m_errors.Add(new CompareError(original, nameof(Json.UANode.HasNoPermissions), original.HasNoPermissions, target.HasNoPermissions)); return false; }
+            // Every Attribute is checked, not just up to the first that differs: one difference must
+            // not hide the rest, or a systematic difference in an early Attribute -- Documentation,
+            // say -- masks everything below it on every Node that has it.
+            var same = true;
+
+            if (original.NodeId != target.NodeId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.NodeId), original.NodeId, target.NodeId)); same = false; }
+            if (original.NodeClass != target.NodeClass) { m_errors.Add(new CompareError(original, nameof(Json.UANode.NodeClass), original.NodeClass, target.NodeClass)); same = false; }
+            if (original.SymbolicName != target.SymbolicName) { m_errors.Add(new CompareError(original, nameof(Json.UANode.SymbolicName), original.SymbolicName, target.SymbolicName)); same = false; }
+            if (original.BrowseName != target.BrowseName) { m_errors.Add(new CompareError(original, nameof(Json.UANode.BrowseName), original.BrowseName, target.BrowseName)); same = false; }
+            if (!Compare(original.DisplayName, target.DisplayName)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.DisplayName), original.DisplayName, target.DisplayName)); same = false; }
+            if (!Compare(original.Description, target.Description)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.Description), original.Description, target.Description)); same = false; }
+            if (original.WriteMask != target.WriteMask) { m_errors.Add(new CompareError(original, nameof(Json.UANode.WriteMask), original.WriteMask, target.WriteMask)); same = false; }
+            if (original.Documentation != target.Documentation) { m_errors.Add(new CompareError(original, nameof(Json.UANode.Documentation), original.Documentation, target.Documentation)); same = false; }
+            if (original.AccessRestrictions != target.AccessRestrictions) { m_errors.Add(new CompareError(original, nameof(Json.UANode.AccessRestrictions), original.AccessRestrictions, target.AccessRestrictions)); same = false; }
+            if (original.HasNoPermissions != target.HasNoPermissions) { m_errors.Add(new CompareError(original, nameof(Json.UANode.HasNoPermissions), original.HasNoPermissions, target.HasNoPermissions)); same = false; }
             // A DataTypeEncoding whose ownership only one side states is a warning, not a failure.
             // Annex I.19 says it should be a child of its DataType, and AdoptDataTypeEncodings
             // derives that from the HasEncoding Reference — but only when the Reference is there to
@@ -417,35 +478,37 @@ namespace NodeSetTool
                 else if (original.ParentId != target.ParentId)
                 {
                     m_errors.Add(new CompareError(original, nameof(Json.UANode.ParentId), original.ParentId, target.ParentId));
-                    return false;
+                    same = false;
                 }
                 else
                 {
                     m_errors.Add(new CompareError(original, nameof(Json.UANode.ReferenceTypeId), original.ReferenceTypeId, target.ReferenceTypeId));
-                    return false;
+                    same = false;
                 }
             }
-            if (original.SuperTypeId != target.SuperTypeId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.SuperTypeId), original.SuperTypeId, target.SuperTypeId)); return false; }
-            if (original.IsAbstract != target.IsAbstract) { m_errors.Add(new CompareError(original, nameof(Json.UANode.IsAbstract), original.IsAbstract, target.IsAbstract)); return false; }
-            if (original.DesignToolOnly != target.DesignToolOnly) { m_errors.Add(new CompareError(original, nameof(Json.UANode.DesignToolOnly), original.DesignToolOnly, target.DesignToolOnly)); return false; }
-            if (original.ModellingRuleId != target.ModellingRuleId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ModellingRuleId), original.ModellingRuleId, target.ModellingRuleId)); return false; }
-            if (original.ReleaseStatus != target.ReleaseStatus) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ReleaseStatus), original.ReleaseStatus, target.ReleaseStatus)); return false; }
-            if (!Compare(original.ConformanceUnits, target.ConformanceUnits)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ConformanceUnits), original.ConformanceUnits, target.ConformanceUnits)); return false; }
+            if (original.SuperTypeId != target.SuperTypeId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.SuperTypeId), original.SuperTypeId, target.SuperTypeId)); same = false; }
+            if (original.IsAbstract != target.IsAbstract) { m_errors.Add(new CompareError(original, nameof(Json.UANode.IsAbstract), original.IsAbstract, target.IsAbstract)); same = false; }
+            if (original.DesignToolOnly != target.DesignToolOnly) { m_errors.Add(new CompareError(original, nameof(Json.UANode.DesignToolOnly), original.DesignToolOnly, target.DesignToolOnly)); same = false; }
+            if (original.ModellingRuleId != target.ModellingRuleId) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ModellingRuleId), original.ModellingRuleId, target.ModellingRuleId)); same = false; }
+            if (original.ReleaseStatus != target.ReleaseStatus) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ReleaseStatus), original.ReleaseStatus, target.ReleaseStatus)); same = false; }
+            if (!Compare(original.ConformanceUnits, target.ConformanceUnits)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.ConformanceUnits), original.ConformanceUnits, target.ConformanceUnits)); same = false; }
             // References are not compared here. A Reference does not stay on the Node that stated
             // it — an inverse one is re-homed onto the Node it points at — so the two NodeSets can
             // hold the same Reference on different Nodes. They are compared as one set of edges by
             // CompareReferences, once, for the whole document.
-            if (!Compare(original, original.Children, target.Children)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.Children), original.Children, target.Children)); return false; }
-            if (!Compare(original.RolePermissions, target.RolePermissions)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.RolePermissions), original.RolePermissions, target.RolePermissions)); return false; }
+            if (!Compare(original, original.Children, target.Children)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.Children), original.Children, target.Children)); same = false; }
+            if (!Compare(original.RolePermissions, target.RolePermissions)) { m_errors.Add(new CompareError(original, nameof(Json.UANode.RolePermissions), original.RolePermissions, target.RolePermissions)); same = false; }
             // The Variant a Variable or VariableType carries. Reports its own error.
-            if (!CompareValues(original, target)) return false;
+            if (!CompareValues(original, target)) same = false;
 
-            return true;
+            return same;
         }
 
         private bool Compare(IList<Json.RolePermission>? original, IList<Json.RolePermission>? target)
         {
-            if (original == null || target == null) return Object.ReferenceEquals(original, target);
+            // Absent and empty are the same answer here too. See Compare(IList<string>).
+            if (original == null || original.Count == 0) return target == null || target.Count == 0;
+            if (target == null) return false;
 
             if (original.Count != target.Count)
             {
@@ -550,7 +613,12 @@ namespace NodeSetTool
 
         private bool Compare(IList<string>? original, IList<string>? target)
         {
-            if (original == null || target == null) return Object.ReferenceEquals(original, target);
+            // An absent list and an empty one say the same thing -- the Node has none -- and which
+            // of the two a reader produces is an artefact of the encoding, not a difference in the
+            // AddressSpace. The XML encoding omits the element; the JSON one may write it empty.
+            if (original == null || original.Count == 0) return target == null || target.Count == 0;
+            if (target == null) return false;
+
             return original.SequenceEqual(target);
         }
 
