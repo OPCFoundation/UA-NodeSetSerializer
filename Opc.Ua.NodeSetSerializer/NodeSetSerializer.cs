@@ -2144,7 +2144,7 @@ namespace NodeSetTool
             var output = new Xml.UADataType();
             Update(output, input);
             output.Purpose = ToXmlDataTypePurpose(input.Purpose);
-            output.Definition = ToXmlDataTypeDefinition(input.Definition, output.BrowseName, output.SymbolicName);
+            output.Definition = ToXmlDataTypeDefinition(input.Definition, output.BrowseName);
             return output;
         }
 
@@ -2863,26 +2863,6 @@ namespace NodeSetTool
             }
         }
 
-        // The text part of a QualifiedName, without the namespace-index prefix: "1:Vector" ->
-        // "Vector". For a name that will not parse, the input stands as the text, matching what
-        // Update does when it falls back to treating the whole BrowseName as the name.
-        private string? ToXmlQualifiedNameText(string? input)
-        {
-            if (String.IsNullOrEmpty(input))
-            {
-                return null;
-            }
-
-            try
-            {
-                return Opc.Ua.QualifiedName.Parse(m_context, input, false).Name;
-            }
-            catch (Exception)
-            {
-                return input;
-            }
-        }
-
         private static Json.LocalizedText? ToJsonLocalizedText(IList<Xml.LocalizedText>? input)
         {
             if (input == null || input.Count == 0)
@@ -3020,8 +3000,8 @@ namespace NodeSetTool
 
             var output = new Json.DataTypeDefinition();
 
-            // Name and SymbolicName are dropped: the containing DataType is the normative source for
-            // both, and ToXmlDataTypeDefinition restores them from it.
+            // Name is dropped: the BrowseName of the containing DataType is the normative source.
+            output.SymbolicName = input.SymbolicName;
             output.IsOptionSet = (input.IsOptionSet) ? input.IsOptionSet : null;
             output.IsUnion = (input.IsUnion) ? input.IsUnion : null;
             output.Fields = new();
@@ -3052,21 +3032,9 @@ namespace NodeSetTool
             return output;
         }
 
-        // browseName and symbolicName come from the containing DataType, which is the normative
-        // source for both Definition attributes; the JSON form stores neither of its own. Pass the
-        // values already written onto the XML node, so the attributes cannot disagree with it.
-        //
-        // Definition/@Name is type QualifiedName, so it carries the BrowseName whole, prefix
-        // included ("1:Vector"). A source that states it without the prefix (Opc.ISA95 does) is
-        // normalized to the prefixed form. Definition/@SymbolicName is type SymbolicName, which
-        // admits only [A-Za-z][A-Za-z0-9_]* and so never carries a prefix.
-        //
-        // SymbolicName is omitted when it would only repeat the name -- compared against the text
-        // part, since the prefixed Name could never equal it -- which is what use="optional" on
-        // that attribute is for. Update already clears the node's SymbolicName in that case, so
-        // this is normally a no-op; it is applied here too so the rule holds for the Definition
-        // however the node was built.
-        private Xml.DataTypeDefinition? ToXmlDataTypeDefinition(Json.DataTypeDefinition? input, string? browseName, string? symbolicName)
+        // browseName is the XML QualifiedName of the containing DataType and is the normative source
+        // for the Definition Name; the JSON form does not store a Name of its own.
+        private Xml.DataTypeDefinition? ToXmlDataTypeDefinition(Json.DataTypeDefinition? input, string? browseName)
         {
             if (input == null)
             {
@@ -3076,7 +3044,7 @@ namespace NodeSetTool
             var output = new Xml.DataTypeDefinition();
 
             output.Name = browseName;
-            output.SymbolicName = (symbolicName == ToXmlQualifiedNameText(browseName)) ? null : symbolicName;
+            output.SymbolicName = input.SymbolicName;
             output.IsOptionSet = input.IsOptionSet ?? false;
             output.IsUnion = input.IsUnion ?? false;
 
