@@ -553,12 +553,9 @@
       }
     },
     "DataTypeDefinition": {
-      "description": "The structure or enumeration definition of a DataType. It has no Name of its own: the BrowseName of the containing DataType is the normative source, and the XML Definition Name attribute is restored from it.",
+      "description": "The structure or enumeration definition of a DataType. It has neither a Name nor a SymbolicName of its own: the containing DataType is the normative source for both, and the XML Definition Name and SymbolicName attributes are restored from its BrowseName and SymbolicName respectively.",
       "type": "object",
       "properties": {
-        "SymbolicName": {
-          "type": "string"
-        },
         "IsUnion": {
           "type": [ "boolean", "null" ]
         },
